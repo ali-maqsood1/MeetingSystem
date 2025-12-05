@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -Wextra -O2 CMakeFiles/meeting_server.dir/src/main.cpp.o -o meeting_server  libstorage.a libserver.a libmanagers.a /usr/lib/x86_64-linux-gnu/libboost_system.so.1.83.0 libstorage.a 

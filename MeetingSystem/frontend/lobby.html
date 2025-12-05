@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Lobby</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 40px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .username {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .create-meeting {
+            margin-bottom: 30px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #eee;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+
+        .meeting-list {
+            margin-top: 20px;
+        }
+
+        .meeting-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .meeting-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 18px;
+        }
+
+        .meeting-code {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .meeting-time {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .join-btn {
+            padding: 10px 25px;
+            width: auto;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+
+        @media (max-width: 968px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🎥 Meeting System</div>
+        <div class="user-info">
+            <span class="username" id="username">Loading...</span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Create Meeting -->
+        <div class="card">
+            <h2>Create Meeting</h2>
+            <div class="create-meeting">
+                <input type="text" id="meeting-title" placeholder="Meeting Title (e.g., Team Standup)">
+                <button onclick="createMeeting()">Create Meeting</button>
+            </div>
+
+            <h2>Join Meeting</h2>
+            <input type="text" id="meeting-code" placeholder="Enter Meeting Code (e.g., ABC-DEF-123)">
+            <button onclick="joinMeeting()">Join Meeting</button>
+        </div>
+
+        <!-- My Meetings -->
+        <div class="card">
+            <h2>My Meetings</h2>
+            <div class="meeting-list" id="meeting-list">
+                <div class="empty-state">
+                    <p>No meetings yet. Create one to get started!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api/v1';
+        let token = sessionStorage.getItem('token');
+        let username = sessionStorage.getItem('username');
+
+        console.log('=== Lobby Page Debug ===');
+        console.log('Token:', token);
+        console.log('Username:', username);
+        console.log('========================');
+
+        // Check authentication
+        if (!token) {
+            console.error('No token found, redirecting to login');
+            window.location.href = 'index.html';
+        }
+
+        // Display username
+        document.getElementById('username').textContent = username || 'User';
+
+        // Load meetings
+        async function loadMeetings() {
+            try {
+                const response = await fetch(`${API_URL}/meetings/my-meetings`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                console.log('My meetings response:', data);
+
+                if (data.success) {
+                    displayMeetings(data.meetings);
+                }
+            } catch (error) {
+                console.error('Error loading meetings:', error);
+            }
+        }
+
+        function displayMeetings(meetings) {
+            const listDiv = document.getElementById('meeting-list');
+            
+            if (!meetings || meetings.length === 0) {
+                listDiv.innerHTML = '<div class="empty-state"><p>No meetings yet. Create one to get started!</p></div>';
+                return;
+            }
+
+            // Parse if it's a string
+            if (typeof meetings === 'string') {
+                meetings = JSON.parse(meetings);
+            }
+
+            listDiv.innerHTML = meetings.map(meeting => `
+                <div class="meeting-item">
+                    <div class="meeting-info">
+                        <h3>${meeting.title}</h3>
+                        <div class="meeting-code">Code: ${meeting.meeting_code}</div>
+                        <div class="meeting-time">Created: ${new Date(meeting.created_at * 1000).toLocaleString()}</div>
+                    </div>
+                    <button class="join-btn" onclick="joinMeetingById('${meeting.meeting_id}', '${meeting.title}', '${meeting.meeting_code}')">
+                        Join
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        async function createMeeting() {
+            const title = document.getElementById('meeting-title').value.trim();
+            
+            if (!title) {
+                alert('Please enter a meeting title');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/meetings/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ title })
+                });
+
+                const data = await response.json();
+                console.log('Create meeting response:', data);
+
+                if (data.success) {
+                    alert(`Meeting created!\n\nCode: ${data.meeting.meeting_code}\n\nShare this code with others to invite them.`);
+                    document.getElementById('meeting-title').value = '';
+                    loadMeetings();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Create meeting error:', error);
+                alert('Connection error');
+            }
+        }
+
+        async function joinMeeting() {
+            const code = document.getElementById('meeting-code').value.trim();
+            
+            if (!code) {
+                alert('Please enter a meeting code');
+                return;
+            }
+            
+            console.log('Attempting to join meeting with code:', code);
+            
+            try {
+                const response = await fetch(`${API_URL}/meetings/join`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ meeting_code: code })
+                });
+                
+                const data = await response.json();
+                console.log('Join meeting response:', data);
+                
+                if (data.success && data.meeting) {
+                    const meetingId = String(data.meeting.meeting_id);
+                    const meetingTitle = data.meeting.title;
+                    
+                    console.log('Join successful:', {
+                        meetingId: meetingId,
+                        meetingTitle: meetingTitle,
+                        meetingCode: code
+                    });
+                    
+                    if (!meetingId || meetingId === 'undefined' || meetingId === 'null') {
+                        alert('Error: Invalid meeting ID received from server');
+                        return;
+                    }
+                    
+                    // Store meeting info in sessionStorage
+                    sessionStorage.setItem('current_meeting_id', meetingId);
+                    sessionStorage.setItem('current_meeting_title', meetingTitle);
+                    sessionStorage.setItem('current_meeting_code', code);
+                    
+                    // Redirect
+                    window.location.href = `meeting.html?id=${meetingId}`;
+                } else {
+                    alert(data.error || 'Failed to join meeting');
+                }
+            } catch (error) {
+                console.error('Error joining meeting:', error);
+                alert('Failed to join meeting');
+            }
+        }
+
+        function joinMeetingById(meetingId, title, code) {
+            console.log('Joining meeting by ID:', { meetingId, title, code });
+            
+            if (!meetingId || meetingId === 'undefined' || meetingId === 'null') {
+                alert('Invalid meeting ID');
+                return;
+            }
+            
+            // Store meeting info
+            sessionStorage.setItem('current_meeting_id', String(meetingId));
+            sessionStorage.setItem('current_meeting_title', title);
+            sessionStorage.setItem('current_meeting_code', code);
+            
+            window.location.href = `meeting.html?id=${meetingId}`;
+        }
+
+        function logout() {
+            fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            sessionStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        // Load meetings on page load
+        loadMeetings();
+    </script>
+</body>
+</html>
