@@ -16,6 +16,45 @@
 #include <memory>
 #include <signal.h>
 
+
+struct WebRTCSignal {
+    std::string type;          // "offer", "answer", "ice-candidate"
+    std::string sdp;           // SDP description (for offer/answer)
+    std::string candidate;     // ICE candidate (for ice-candidate)
+    std::string sdp_mid;       // Media stream ID
+    int sdp_m_line_index;      // Media line index
+    uint64_t from_user_id;
+    uint64_t to_user_id;
+    uint64_t timestamp;
+    
+    WebRTCSignal() : sdp_m_line_index(0), from_user_id(0), to_user_id(0), timestamp(0) {}
+};
+
+
+
+// Helper function to serialize WebRTCSignal to JSON
+std::string serialize_signal(const WebRTCSignal& sig) {
+    std::string json = "{";
+    json += "\"type\":\"" + sig.type + "\",";
+    
+    if (!sig.sdp.empty()) {
+        json += "\"sdp\":\"" + sig.sdp + "\",";
+    }
+    
+    if (!sig.candidate.empty()) {
+        json += "\"candidate\":\"" + sig.candidate + "\",";
+        json += "\"sdpMid\":\"" + sig.sdp_mid + "\",";
+        json += "\"sdpMLineIndex\":" + std::to_string(sig.sdp_m_line_index) + ",";
+    }
+    
+    json += "\"from\":" + std::to_string(sig.from_user_id) + ",";
+    json += "\"to\":" + std::to_string(sig.to_user_id) + ",";
+    json += "\"timestamp\":" + std::to_string(sig.timestamp);
+    json += "}";
+    
+    return json;
+}
+
 // Global server pointer for signal handling
 HTTPServer* g_server = nullptr;
 
@@ -26,6 +65,10 @@ void signal_handler(int signal) {
     }
     exit(0);
 }
+
+std::map<uint64_t, std::vector<WebRTCSignal>> pending_signals;
+std::mutex signals_mutex;
+
 
 int main(int argc, char* argv[]) {
     std::cout << "========================================" << std::endl;
@@ -269,9 +312,6 @@ int main(int argc, char* argv[]) {
                     res.set_json_body(JSON::error(error));
                 }
             });
-        
-        // POST /api/v1/meetings/join
-        // POST /api/v1/meetings/join
 // POST /api/v1/meetings/join
 server.add_route("POST", "/api/v1/meetings/join",
     [&auth_manager, &meeting_manager](const HTTPRequest& req, HTTPResponse& res) {
@@ -289,7 +329,6 @@ server.add_route("POST", "/api/v1/meetings/join",
         std::string error;
         
         if (meeting_manager.join_meeting(meeting_code, user_id, meeting, error)) {
-            // ✅ BUILD NESTED OBJECT MANUALLY WITHOUT JSON::build()
             std::string response = "{\"success\":true,\"meeting\":{";
             response += "\"meeting_id\":" + std::to_string(meeting.meeting_id) + ",";
             response += "\"title\":\"" + std::string(meeting.title) + "\",";
@@ -396,9 +435,8 @@ server.add_route("GET", "/api/v1/meetings/:id/messages",
             return;
         }
         
-        // ✅ SAFE PARSING
         auto [success, meeting_id] = parse_meeting_id(req.path_params, res);
-        if (!success) return;  // Error already set in response
+        if (!success) return;  
         
         auto messages = chat_manager.get_messages(meeting_id, 50);
         
@@ -462,7 +500,6 @@ server.add_route("POST", "/api/v1/meetings/:id/files/upload",
         uint64_t meeting_id = std::stoull(req.path_params.at("id"));
         
         try {
-            // Debug: log incoming upload body size and preview (escaped + hex) to diagnose 400s
             std::cout << "DEBUG: upload handler received body size=" << req.body.size();
             if (req.headers.find("Content-Type") != req.headers.end()) {
                 std::cout << ", Content-Type='" << req.headers.at("Content-Type") << "'";
@@ -472,7 +509,6 @@ server.add_route("POST", "/api/v1/meetings/:id/files/upload",
             }
             std::cout << std::endl;
 
-            // Print a printable preview with non-printable chars escaped
             auto make_escaped = [](const std::string& s, size_t maxlen) {
                 std::string out;
                 for (size_t i = 0; i < s.size() && out.size() < maxlen; ++i) {
@@ -698,6 +734,148 @@ server.add_route("GET", "/api/v1/meetings/:id/whiteboard/elements",
         
         res.set_json_body(JSON::success(
             JSON::field("elements", JSON::array(element_objects))
+        ));
+    });
+
+
+    // ============ WEBRTC SIGNALING ROUTES ============
+
+// POST /api/v1/meetings/:id/webrtc/signal
+// Send WebRTC signaling message (offer/answer/ICE candidate)
+server.add_route("POST", "/api/v1/meetings/:id/webrtc/signal",
+    [&auth_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+        
+        try {
+            auto data = JSON::parse(req.body);
+            
+            WebRTCSignal signal;
+            signal.type = data["type"];
+            signal.from_user_id = user_id;
+            signal.timestamp = std::time(nullptr);
+            
+            // Parse target user
+            if (data.find("to") != data.end() && !data["to"].empty()) {
+                signal.to_user_id = std::stoull(data["to"]);
+            } else {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error("Missing 'to' field"));
+                return;
+            }
+            
+            // Parse type-specific fields
+            if (signal.type == "offer" || signal.type == "answer") {
+                if (data.find("sdp") != data.end()) {
+                    signal.sdp = data["sdp"];
+                }
+            } else if (signal.type == "ice-candidate") {
+                if (data.find("candidate") != data.end()) {
+                    signal.candidate = data["candidate"];
+                }
+                if (data.find("sdpMid") != data.end()) {
+                    signal.sdp_mid = data["sdpMid"];
+                }
+                if (data.find("sdpMLineIndex") != data.end()) {
+                    signal.sdp_m_line_index = std::stoi(data["sdpMLineIndex"]);
+                }
+            }
+            
+            
+            {
+                std::lock_guard<std::mutex> lock(signals_mutex);
+                pending_signals[signal.to_user_id].push_back(signal);
+            }
+            
+            std::cout << "WebRTC signal queued: " << signal.type 
+                      << " from user " << signal.from_user_id 
+                      << " to user " << signal.to_user_id << std::endl;
+            
+            res.set_json_body(JSON::success(
+                JSON::field("message", "Signal queued")
+            ));
+            
+        } catch (const std::exception& e) {
+            res.set_status(400, "Bad Request");
+            res.set_json_body(JSON::error(std::string("Invalid signal: ") + e.what()));
+        }
+    });
+
+// GET /api/v1/meetings/:id/webrtc/signals
+// Poll for incoming WebRTC signals
+server.add_route("GET", "/api/v1/meetings/:id/webrtc/signals",
+    [&auth_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+        
+        std::vector<WebRTCSignal> user_signals;
+        
+        {
+            std::lock_guard<std::mutex> lock(signals_mutex);
+            auto it = pending_signals.find(user_id);
+            if (it != pending_signals.end()) {
+                user_signals = it->second;
+                pending_signals.erase(it);  // Clear after reading
+            }
+        }
+        
+        std::vector<std::string> signal_jsons;
+        for (const auto& sig : user_signals) {
+            signal_jsons.push_back(serialize_signal(sig));
+        }
+        
+        std::string signals_array = "[";
+        for (size_t i = 0; i < signal_jsons.size(); ++i) {
+            signals_array += signal_jsons[i];
+            if (i < signal_jsons.size() - 1) {
+                signals_array += ",";
+            }
+        }
+        signals_array += "]";
+        
+        res.set_json_body(JSON::success(
+            JSON::field("signals", false)  
+        ));
+    });
+
+// GET /api/v1/meetings/:id/participants
+// Get list of participants for peer discovery
+server.add_route("GET", "/api/v1/meetings/:id/participants",
+    [&auth_manager, &meeting_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+        
+        uint64_t meeting_id = std::stoull(req.path_params.at("id"));
+        
+        
+        auto participants = meeting_manager.get_participants(meeting_id);
+        
+        std::vector<std::string> participant_objects;
+        for (const auto& participant : participants) {
+            User user;
+            if (auth_manager.get_user_by_id(participant.user_id, user)) {
+                participant_objects.push_back(JSON::build(
+                    JSON::field("user_id", user.user_id) + "," +
+                    JSON::field("username", user.username) + "," +
+                    JSON::field("joined_at", participant.joined_at)
+                ));
+            }
+        }
+        
+        res.set_json_body(JSON::success(
+            JSON::field("participants", JSON::array(participant_objects))
         ));
     });
 

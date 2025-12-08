@@ -8,12 +8,24 @@
 #include <string>
 #include <vector>
 #include <random>
+#include <map>
+
+struct MeetingParticipant {
+    uint64_t user_id;
+    uint64_t joined_at;
+    bool is_active;
+    
+    MeetingParticipant() : user_id(0), joined_at(0), is_active(true) {}
+};
 
 class MeetingManager {
 private:
     DatabaseEngine* db;
     BTree* meetings_btree;
     HashTable* meeting_code_hash;
+
+    
+    std::mutex participants_mutex;
     
 public:
     MeetingManager(DatabaseEngine* database, BTree* meetings_tree, HashTable* code_hash)
@@ -41,8 +53,19 @@ public:
     
     // Get user's meetings
     std::vector<Meeting> get_user_meetings(uint64_t user_id);
+
+    // Add participant when joining meeting
+    bool add_participant(uint64_t meeting_id, uint64_t user_id);
+    
+    // Remove participant when leaving
+    bool remove_participant(uint64_t meeting_id, uint64_t user_id);
+    
+    // Get all participants in meeting
+    std::vector<MeetingParticipant> get_participants(uint64_t meeting_id);
     
 private:
+
+    std::map<uint64_t, std::vector<MeetingParticipant>> meeting_participants;
     // Generate unique meeting code (ABC-DEF-123 format)
     std::string generate_meeting_code();
     
@@ -53,4 +76,4 @@ private:
     bool update_meeting(const Meeting& meeting);
 };
 
-#endif // MEETING_MANAGER_H
+#endif 

@@ -134,7 +134,12 @@ bool MeetingManager::join_meeting(const std::string& meeting_code, uint64_t user
     
     
     std::cout << "User " << user_id << " joined meeting: " << out_meeting.title << std::endl;
-    return true;
+    bool success = true;
+    if (success) {
+        add_participant(out_meeting.meeting_id, user_id);
+    }
+    
+    return success;
 }
 
 bool MeetingManager::get_meeting(uint64_t meeting_id, Meeting& out_meeting) {
@@ -236,4 +241,58 @@ std::vector<Meeting> MeetingManager::get_user_meetings(uint64_t user_id) {
     }
     
     return user_meetings;
+}
+
+
+bool MeetingManager::add_participant(uint64_t meeting_id, uint64_t user_id) {
+    std::lock_guard<std::mutex> lock(participants_mutex);
+    
+    auto& participants = meeting_participants[meeting_id];
+    
+    // Check if already in meeting
+    for (const auto& p : participants) {
+        if (p.user_id == user_id) {
+            return true;  // Already joined
+        }
+    }
+    
+    MeetingParticipant participant;
+    participant.user_id = user_id;
+    participant.joined_at = std::time(nullptr);
+    participant.is_active = true;
+    
+    participants.push_back(participant);
+    
+    std::cout << "User " << user_id << " joined meeting " << meeting_id << std::endl;
+    return true;
+}
+
+bool MeetingManager::remove_participant(uint64_t meeting_id, uint64_t user_id) {
+    std::lock_guard<std::mutex> lock(participants_mutex);
+    
+    auto it = meeting_participants.find(meeting_id);
+    if (it == meeting_participants.end()) {
+        return false;
+    }
+    
+    auto& participants = it->second;
+    participants.erase(
+        std::remove_if(participants.begin(), participants.end(),
+            [user_id](const MeetingParticipant& p) { return p.user_id == user_id; }),
+        participants.end()
+    );
+    
+    std::cout << "User " << user_id << " left meeting " << meeting_id << std::endl;
+    return true;
+}
+
+std::vector<MeetingParticipant> MeetingManager::get_participants(uint64_t meeting_id) {
+    std::lock_guard<std::mutex> lock(participants_mutex);
+    
+    auto it = meeting_participants.find(meeting_id);
+    if (it == meeting_participants.end()) {
+        return {};
+    }
+    
+    return it->second;
 }

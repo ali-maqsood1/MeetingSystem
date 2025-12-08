@@ -1,3 +1,0 @@
-This is a test file for the meeting system
-Second line of content
-Third line with more data
