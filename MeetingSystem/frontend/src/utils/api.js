@@ -119,6 +119,48 @@ export const api = {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return response.json();
+  },
+
+  // File endpoints
+  getFiles: async (meetingId) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/meetings/${meetingId}/files`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
+  },
+
+  uploadFile: async (meetingId, filename, base64Data) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/meetings/${meetingId}/files/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ 
+        filename: filename,
+        data: base64Data 
+      })
+    });
+    return response.json();
+  },
+
+  downloadFile: async (meetingId, fileId) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/meetings/${meetingId}/files/${fileId}/download`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
+  },
+
+  deleteFile: async (meetingId, fileId) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/meetings/${meetingId}/files/${fileId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
   }
 };
 

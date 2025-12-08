@@ -61,3 +61,4 @@ public:
 };
 
 #endif // SCREEN_SHARE_MANAGER_H
+

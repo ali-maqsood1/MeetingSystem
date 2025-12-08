@@ -56,3 +56,6 @@ private:
 };
 
 #endif // CHAT_MANAGER_H
+
+
+

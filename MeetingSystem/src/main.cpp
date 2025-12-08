@@ -9,7 +9,10 @@
 #include "managers/WhiteboardManager.h"
 #include "managers/ScreenShareManager.h"
 #include "utils/JSON.h"
+#include <utils/Hash.h>
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 #include <memory>
 #include <signal.h>
 
@@ -418,6 +421,36 @@ server.add_route("GET", "/api/v1/meetings/:id/messages",
 
 // GET /api/v1/meetings/:id/files
 server.add_route("GET", "/api/v1/meetings/:id/files",
+    [&auth_manager, &file_manager, parse_meeting_id](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+
+        auto [success, meeting_id] = parse_meeting_id(req.path_params, res);
+        if (!success) return;
+
+        auto files = file_manager.get_meeting_files(meeting_id);
+        std::vector<std::string> file_objects;
+        for (const auto& f : files) {
+            file_objects.push_back(JSON::build(
+                JSON::field("file_id", f.file_id) + "," +
+                JSON::field("filename", f.filename) + "," +
+                JSON::field("file_size", f.file_size) + "," +
+                JSON::field("uploaded_at", f.uploaded_at) + "," +
+                JSON::field("uploader_id", f.uploader_id)
+            ));
+        }
+
+        res.set_json_body(JSON::success(
+            JSON::field("files", JSON::array(file_objects))
+        ));
+    });
+
+// POST /api/v1/meetings/:id/files/upload
+server.add_route("POST", "/api/v1/meetings/:id/files/upload",
     [&auth_manager, &file_manager](const HTTPRequest& req, HTTPResponse& res) {
         uint64_t user_id;
         if (!auth_manager.verify_token(req.auth_token, user_id)) {
@@ -428,22 +461,157 @@ server.add_route("GET", "/api/v1/meetings/:id/files",
         
         uint64_t meeting_id = std::stoull(req.path_params.at("id"));
         
-        auto files = file_manager.get_meeting_files(meeting_id);
-        
-        std::vector<std::string> file_objects;
-        for (const auto& file : files) {
-            file_objects.push_back(JSON::build(
-                JSON::field("file_id", file.file_id) + "," +
-                JSON::field("filename", file.filename) + "," +
-                JSON::field("file_size", file.file_size) + "," +
-                JSON::field("uploaded_at", file.uploaded_at)
-            ));
+        try {
+            // Debug: log incoming upload body size and preview (escaped + hex) to diagnose 400s
+            std::cout << "DEBUG: upload handler received body size=" << req.body.size();
+            if (req.headers.find("Content-Type") != req.headers.end()) {
+                std::cout << ", Content-Type='" << req.headers.at("Content-Type") << "'";
+            }
+            if (req.headers.find("Transfer-Encoding") != req.headers.end()) {
+                std::cout << ", Transfer-Encoding='" << req.headers.at("Transfer-Encoding") << "'";
+            }
+            std::cout << std::endl;
+
+            // Print a printable preview with non-printable chars escaped
+            auto make_escaped = [](const std::string& s, size_t maxlen) {
+                std::string out;
+                for (size_t i = 0; i < s.size() && out.size() < maxlen; ++i) {
+                    unsigned char c = s[i];
+                    if (c >= 32 && c <= 126) {
+                        out += c;
+                    } else if (c == '\n') {
+                        out += "\\n";
+                    } else if (c == '\r') {
+                        out += "\\r";
+                    } else if (c == '\t') {
+                        out += "\\t";
+                    } else {
+                        out += '.'; // unprintable
+                    }
+                }
+                return out;
+            };
+
+            if (!req.body.empty()) {
+                std::string escaped = make_escaped(req.body, 200);
+                std::cout << "DEBUG: upload preview (escaped)='" << escaped << "'" << std::endl;
+
+                // Print first 64 bytes as hex for precise inspection
+                std::ostringstream hexout;
+                size_t hex_len = std::min<size_t>(req.body.size(), 64);
+                hexout << std::hex << std::setfill('0');
+                for (size_t i = 0; i < hex_len; ++i) {
+                    hexout << std::setw(2) << (static_cast<unsigned int>(static_cast<unsigned char>(req.body[i]))) << " ";
+                }
+                std::cout << "DEBUG: upload preview (hex, first " << hex_len << " bytes)='" << hexout.str() << "'" << std::endl;
+            }
+
+            auto data = JSON::parse(req.body);
+
+            std::string filename = data["filename"];
+            std::string base64_data = data["data"];
+            
+            if (filename.empty() || base64_data.empty()) {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error("Filename and data are required"));
+                return;
+            }
+            
+            // Decode base64
+            std::vector<uint8_t> file_data = decode_base64(base64_data);
+            if (file_data.empty() && !base64_data.empty()) {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error("Failed to decode base64 data"));
+                return;
+            }
+            
+            FileRecord file;
+            std::string error;
+            
+            if (file_manager.upload_file(meeting_id, user_id, filename, 
+                                         file_data.data(), file_data.size(), 
+                                         file, error)) {
+                res.set_status(201, "Created");
+                res.set_json_body(JSON::success(
+                    JSON::field("file_id", file.file_id) + "," +
+                    JSON::field("filename", file.filename) + "," +
+                    JSON::field("file_size", file.file_size) + "," +
+                    JSON::field("uploaded_at", file.uploaded_at)
+                ));
+            } else {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error(error));
+            }
+        } catch (const std::exception& e) {
+            res.set_status(400, "Bad Request");
+            res.set_json_body(JSON::error(std::string("Invalid request: ") + e.what()));
+        }
+    });
+
+// GET /api/v1/meetings/:id/files/:file_id/download
+server.add_route("GET", "/api/v1/meetings/:id/files/:file_id/download",
+    [&auth_manager, &file_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
         }
         
-        res.set_json_body(JSON::success(
-            JSON::field("files", JSON::array(file_objects))
-        ));
+        try {
+            uint64_t file_id = std::stoull(req.path_params.at("file_id"));
+            
+            std::vector<uint8_t> file_data;
+            FileRecord file;
+            std::string error;
+            
+            if (file_manager.download_file(file_id, file_data, file, error)) {
+                // Encode to base64 for JSON transport
+                std::string base64_data = encode_base64(file_data);
+                
+                res.set_json_body(JSON::success(
+                    JSON::field("filename", file.filename) + "," +
+                    JSON::field("data", base64_data) + "," +
+                    JSON::field("file_size", file.file_size)
+                ));
+            } else {
+                res.set_status(404, "Not Found");
+                res.set_json_body(JSON::error(error));
+            }
+        } catch (const std::exception& e) {
+            res.set_status(400, "Bad Request");
+            res.set_json_body(JSON::error("Invalid file ID"));
+        }
     });
+
+// DELETE /api/v1/meetings/:id/files/:file_id
+server.add_route("DELETE", "/api/v1/meetings/:id/files/:file_id",
+    [&auth_manager, &file_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+        
+        try {
+            uint64_t file_id = std::stoull(req.path_params.at("file_id"));
+            
+            std::string error;
+            if (file_manager.delete_file(file_id, error)) {
+                res.set_json_body(JSON::success(
+                    JSON::field("message", "File deleted successfully")
+                ));
+            } else {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error(error));
+            }
+        } catch (const std::exception& e) {
+            res.set_status(400, "Bad Request");
+            res.set_json_body(JSON::error("Invalid file ID"));
+        }
+    });
+
 
 // ============ WHITEBOARD ROUTES ============
 
@@ -636,7 +804,7 @@ server.add_route("POST", "/api/v1/meetings/:id/whiteboard/clear",
                 res.set_json_body("{\"status\":\"ok\",\"service\":\"MeetingSystem\"}");
             });
         
-        std::cout << "  Registered " << 17 << " routes" << std::endl;
+        std::cout << "  Registered " << 20 << " routes" << std::endl;
         
         // Start server
         std::cout << "\n[6/6] Starting HTTP server on port " << port << "..." << std::endl;

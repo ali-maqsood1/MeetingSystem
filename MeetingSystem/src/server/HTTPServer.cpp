@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <iterator>
 
 // HTTPConnection implementation
 void HTTPConnection::read_request() {
@@ -9,24 +10,86 @@ void HTTPConnection::read_request() {
     boost::asio::async_read_until(socket, buffer, "\r\n\r\n",
         [this, self](boost::system::error_code ec, std::size_t bytes) {
             if (!ec) {
+                // Read and parse request line + headers
                 std::istream stream(&buffer);
-                std::string raw_request;
-                std::string line;
-                
-                // Read all data
-                while (std::getline(stream, line)) {
-                    raw_request += line + "\n";
+                std::string request_line;
+                if (!std::getline(stream, request_line)) {
+                    std::cerr << "Failed to read request line" << std::endl;
+                    return;
                 }
-                
-                // Parse request
-                HTTPRequest request = parse_request(raw_request);
-                
-                // Handle request
-                HTTPResponse response;
-                request_handler(request, response);
-                
-                // Write response
-                write_response(response);
+
+                // Read header lines
+                std::vector<std::string> header_lines;
+                std::string line;
+                while (std::getline(stream, line) && line != "\r" && !line.empty()) {
+                    header_lines.push_back(line);
+                }
+
+                // Parse headers to get Content-Length
+                std::map<std::string, std::string> temp_headers;
+                int content_length = 0;
+                for (const auto& hl : header_lines) {
+                    size_t colon_pos = hl.find(':');
+                    if (colon_pos != std::string::npos) {
+                        std::string key = hl.substr(0, colon_pos);
+                        std::string value = hl.substr(colon_pos + 1);
+                        // trim
+                        value.erase(0, value.find_first_not_of(" \t\r\n"));
+                        value.erase(value.find_last_not_of(" \t\r\n") + 1);
+                        temp_headers[key] = value;
+                        if (key == "Content-Length") {
+                            try {
+                                content_length = std::stoi(value);
+                            } catch (...) {
+                                content_length = 0;
+                            }
+                        }
+                    }
+                }
+
+                // Read any body data already in buffer
+                std::string body_so_far((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+
+                // Lambda to process the complete request
+                auto process_request = [this, request_line, header_lines](const std::string& full_body) {
+                    // Build raw request string
+                    std::string raw_request = request_line + "\n";
+                    for (const auto& hl : header_lines) {
+                        raw_request += hl + "\n";
+                    }
+                    raw_request += "\n";
+                    raw_request += full_body;
+
+                    HTTPRequest request = parse_request(raw_request);
+                    HTTPResponse response;
+                    request_handler(request, response);
+                    write_response(response);
+                };
+
+                if (content_length > 0 && (int)body_so_far.size() < content_length) {
+                    // Need to read more bytes
+                    std::size_t bytes_needed = content_length - body_so_far.size();
+                    
+                    // Create a new buffer for remaining data
+                    auto remaining_buffer = std::make_shared<std::vector<char>>(bytes_needed);
+                    
+                    boost::asio::async_read(socket, 
+                        boost::asio::buffer(*remaining_buffer), 
+                        boost::asio::transfer_exactly(bytes_needed),
+                        [this, self, body_so_far, remaining_buffer, process_request](boost::system::error_code ec2, std::size_t bytes_read) mutable {
+                            if (!ec2) {
+                                // Append remaining bytes to body
+                                body_so_far.append(remaining_buffer->begin(), remaining_buffer->end());
+                                process_request(body_so_far);
+                            } else {
+                                std::cerr << "Error reading request body: " << ec2.message() << std::endl;
+                            }
+                        }
+                    );
+                } else {
+                    // We have all the body (or no body expected)
+                    process_request(body_so_far);
+                }
             } else {
                 std::cerr << "Error reading request: " << ec.message() << std::endl;
             }
@@ -69,6 +132,7 @@ HTTPRequest HTTPConnection::parse_request(const std::string& raw_request) {
     }
     
     // Parse headers
+    int content_length = 0;
     while (std::getline(stream, line) && line != "\r" && !line.empty()) {
         size_t colon_pos = line.find(':');
         if (colon_pos != std::string::npos) {
@@ -80,6 +144,14 @@ HTTPRequest HTTPConnection::parse_request(const std::string& raw_request) {
             value.erase(value.find_last_not_of(" \t\r\n") + 1);
             
             request.headers[key] = value;
+            
+            if (key == "Content-Length") {
+                try {
+                    content_length = std::stoi(value);
+                } catch (...) {
+                    content_length = 0;
+                }
+            }
         }
     }
     
@@ -92,12 +164,15 @@ HTTPRequest HTTPConnection::parse_request(const std::string& raw_request) {
         }
     }
     
-    // Read body (if any)
-    auto content_length_it = request.headers.find("Content-Length");
-    if (content_length_it != request.headers.end()) {
-        int content_length = std::stoi(content_length_it->second);
-        request.body.resize(content_length);
-        stream.read(&request.body[0], content_length);
+    // Read body - everything remaining in the stream
+    std::string remaining_body((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+    
+    if (content_length > 0) {
+        // Take exactly content_length bytes
+        request.body = remaining_body.substr(0, std::min((size_t)content_length, remaining_body.size()));
+    } else {
+        // No Content-Length, take everything
+        request.body = remaining_body;
     }
     
     return request;
@@ -184,9 +259,7 @@ void HTTPServer::accept_connections() {
 }
 
 void HTTPServer::handle_request(HTTPRequest& req, HTTPResponse& res) {
-    std::cout << req.method << " " << req.path << std::endl;
-    // Always add CORS headers so browser clients can call this API from other origins.
-    // These headers will be present on all responses including errors.
+    // Always add CORS headers
     res.headers["Access-Control-Allow-Origin"] = "*";
     res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
     res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
@@ -194,7 +267,6 @@ void HTTPServer::handle_request(HTTPRequest& req, HTTPResponse& res) {
 
     // Respond to preflight CORS requests immediately
     if (req.method == "OPTIONS") {
-        // No body needed for preflight
         res.set_status(204, "No Content");
         res.set_json_body("");
         return;

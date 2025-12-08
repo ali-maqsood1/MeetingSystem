@@ -445,6 +445,30 @@ src/storage/HashTable.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/storage.dir/build.make CMakeFiles/storage.dir/src/storage/HashTable.cpp.s
 .PHONY : src/storage/HashTable.cpp.s
 
+src/utils/Hash.o: src/utils/Hash.cpp.o
+.PHONY : src/utils/Hash.o
+
+# target to build an object file
+src/utils/Hash.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/managers.dir/build.make CMakeFiles/managers.dir/src/utils/Hash.cpp.o
+.PHONY : src/utils/Hash.cpp.o
+
+src/utils/Hash.i: src/utils/Hash.cpp.i
+.PHONY : src/utils/Hash.i
+
+# target to preprocess a source file
+src/utils/Hash.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/managers.dir/build.make CMakeFiles/managers.dir/src/utils/Hash.cpp.i
+.PHONY : src/utils/Hash.cpp.i
+
+src/utils/Hash.s: src/utils/Hash.cpp.s
+.PHONY : src/utils/Hash.s
+
+# target to generate assembly for a file
+src/utils/Hash.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/managers.dir/build.make CMakeFiles/managers.dir/src/utils/Hash.cpp.s
+.PHONY : src/utils/Hash.cpp.s
+
 tests/test_storage.o: tests/test_storage.cpp.o
 .PHONY : tests/test_storage.o
 
@@ -515,6 +539,9 @@ help:
 	@echo "... src/storage/HashTable.o"
 	@echo "... src/storage/HashTable.i"
 	@echo "... src/storage/HashTable.s"
+	@echo "... src/utils/Hash.o"
+	@echo "... src/utils/Hash.i"
+	@echo "... src/utils/Hash.s"
 	@echo "... tests/test_storage.o"
 	@echo "... tests/test_storage.i"
 	@echo "... tests/test_storage.s"

@@ -153,6 +153,20 @@ CMakeFiles/managers.dir/src/managers/ScreenShareManager.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/managers.dir/src/managers/ScreenShareManager.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/src/managers/ScreenShareManager.cpp -o CMakeFiles/managers.dir/src/managers/ScreenShareManager.cpp.s
 
+CMakeFiles/managers.dir/src/utils/Hash.cpp.o: CMakeFiles/managers.dir/flags.make
+CMakeFiles/managers.dir/src/utils/Hash.cpp.o: /home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/src/utils/Hash.cpp
+CMakeFiles/managers.dir/src/utils/Hash.cpp.o: CMakeFiles/managers.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/managers.dir/src/utils/Hash.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/managers.dir/src/utils/Hash.cpp.o -MF CMakeFiles/managers.dir/src/utils/Hash.cpp.o.d -o CMakeFiles/managers.dir/src/utils/Hash.cpp.o -c /home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/src/utils/Hash.cpp
+
+CMakeFiles/managers.dir/src/utils/Hash.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/managers.dir/src/utils/Hash.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/src/utils/Hash.cpp > CMakeFiles/managers.dir/src/utils/Hash.cpp.i
+
+CMakeFiles/managers.dir/src/utils/Hash.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/managers.dir/src/utils/Hash.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/src/utils/Hash.cpp -o CMakeFiles/managers.dir/src/utils/Hash.cpp.s
+
 # Object files for target managers
 managers_OBJECTS = \
 "CMakeFiles/managers.dir/src/managers/AuthManager.cpp.o" \
@@ -160,7 +174,8 @@ managers_OBJECTS = \
 "CMakeFiles/managers.dir/src/managers/ChatManager.cpp.o" \
 "CMakeFiles/managers.dir/src/managers/FileManager.cpp.o" \
 "CMakeFiles/managers.dir/src/managers/WhiteboardManager.cpp.o" \
-"CMakeFiles/managers.dir/src/managers/ScreenShareManager.cpp.o"
+"CMakeFiles/managers.dir/src/managers/ScreenShareManager.cpp.o" \
+"CMakeFiles/managers.dir/src/utils/Hash.cpp.o"
 
 # External object files for target managers
 managers_EXTERNAL_OBJECTS =
@@ -171,9 +186,10 @@ libmanagers.a: CMakeFiles/managers.dir/src/managers/ChatManager.cpp.o
 libmanagers.a: CMakeFiles/managers.dir/src/managers/FileManager.cpp.o
 libmanagers.a: CMakeFiles/managers.dir/src/managers/WhiteboardManager.cpp.o
 libmanagers.a: CMakeFiles/managers.dir/src/managers/ScreenShareManager.cpp.o
+libmanagers.a: CMakeFiles/managers.dir/src/utils/Hash.cpp.o
 libmanagers.a: CMakeFiles/managers.dir/build.make
 libmanagers.a: CMakeFiles/managers.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX static library libmanagers.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX static library libmanagers.a"
 	$(CMAKE_COMMAND) -P CMakeFiles/managers.dir/cmake_clean_target.cmake
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/managers.dir/link.txt --verbose=$(VERBOSE)
 

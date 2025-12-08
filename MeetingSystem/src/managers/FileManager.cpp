@@ -138,8 +138,19 @@ bool FileManager::upload_file(uint64_t meeting_id, uint64_t uploader_id,
         return false;
     }
     
-    if (data_size > 50 * 1024 * 1024) { // 50MB limit
-        error = "File too large (max 50MB)";
+    if (data_size > 10 * 1024 * 1024) { // 10MB limit
+        error = "File too large (max 10MB)";
+        return false;
+    }
+
+    auto existing_files = get_meeting_files(meeting_id);
+    size_t total_size = 0;
+    for (const auto& f : existing_files) {
+        total_size += f.file_size;
+    }
+    
+    if (total_size + data_size > 50 * 1024 * 1024) {
+        error = "Meeting storage limit exceeded (max 50MB total)";
         return false;
     }
     
@@ -264,9 +275,17 @@ bool FileManager::delete_file(uint64_t file_id, std::string& error) {
         return false;
     }
     
-    // For DSA project, we'll just mark as deleted
-    // Full implementation would free pages and remove from indexes
-    std::cout << "File marked for deletion: " << file.filename << std::endl;
+    // Remove from B-Tree index
+    if (!files_btree->remove(file_id)) {
+        std::cerr << "Warning: Failed to remove file from B-Tree" << std::endl;
+        // Continue anyway - the important thing is it won't show up in queries
+    }
+    
+    // Note: We're NOT freeing the data pages or removing from hash table
+    // because other files might be referencing the same data (deduplication)
+    // For a full implementation, you'd need reference counting
+    
+    std::cout << "File deleted: " << file.filename << " (ID: " << file_id << ")" << std::endl;
     return true;
 }
 
