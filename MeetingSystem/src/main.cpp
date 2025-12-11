@@ -280,38 +280,42 @@ int main(int argc, char* argv[]) {
         // ============ MEETING ROUTES ============
         
         // POST /api/v1/meetings/create
-        server.add_route("POST", "/api/v1/meetings/create",
-            [&auth_manager, &meeting_manager](const HTTPRequest& req, HTTPResponse& res) {
-                uint64_t user_id;
-                if (!auth_manager.verify_token(req.auth_token, user_id)) {
-                    res.set_status(401, "Unauthorized");
-                    res.set_json_body(JSON::error("Invalid or expired token"));
-                    return;
-                }
-                
-                auto data = JSON::parse(req.body);
-                std::string title = data["title"];
-                
-                Meeting meeting;
-                std::string error;
-                
-                if (meeting_manager.create_meeting(user_id, title, meeting, error)) {
-                    res.set_status(201, "Created");
-                    res.set_json_body(JSON::success(
-                        JSON::field("meeting", JSON::build(
-                            JSON::field("meeting_id", meeting.meeting_id) + "," +
-                            JSON::field("meeting_code", meeting.meeting_code) + "," +
-                            JSON::field("title", meeting.title) + "," +
-                            JSON::field("creator_id", meeting.creator_id) + "," +
-                            JSON::field("created_at", meeting.created_at) + "," +
-                            JSON::field("is_active", meeting.is_active)
-                        ))
-                    ));
-                } else {
-                    res.set_status(400, "Bad Request");
-                    res.set_json_body(JSON::error(error));
-                }
-            });
+        // POST /api/v1/meetings/create
+server.add_route("POST", "/api/v1/meetings/create",
+    [&auth_manager, &meeting_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+        
+        auto data = JSON::parse(req.body);
+        std::string title = data["title"];
+        
+        Meeting meeting;
+        std::string error;
+        
+        if (meeting_manager.create_meeting(user_id, title, meeting, error)) {
+            // ✅ ADD CREATOR AS PARTICIPANT
+            meeting_manager.add_participant(meeting.meeting_id, user_id);
+            
+            res.set_status(201, "Created");
+            res.set_json_body(JSON::success(
+                JSON::field("meeting", JSON::build(
+                    JSON::field("meeting_id", meeting.meeting_id) + "," +
+                    JSON::field("meeting_code", meeting.meeting_code) + "," +
+                    JSON::field("title", meeting.title) + "," +
+                    JSON::field("creator_id", meeting.creator_id) + "," +
+                    JSON::field("created_at", meeting.created_at) + "," +
+                    JSON::field("is_active", meeting.is_active)
+                ))
+            ));
+        } else {
+            res.set_status(400, "Bad Request");
+            res.set_json_body(JSON::error(error));
+        }
+    });
 // POST /api/v1/meetings/join
 server.add_route("POST", "/api/v1/meetings/join",
     [&auth_manager, &meeting_manager](const HTTPRequest& req, HTTPResponse& res) {
@@ -806,7 +810,7 @@ server.add_route("POST", "/api/v1/meetings/:id/webrtc/signal",
     });
 
 // GET /api/v1/meetings/:id/webrtc/signals
-// Poll for incoming WebRTC signals
+// GET /api/v1/meetings/:id/webrtc/signals
 server.add_route("GET", "/api/v1/meetings/:id/webrtc/signals",
     [&auth_manager](const HTTPRequest& req, HTTPResponse& res) {
         uint64_t user_id;
@@ -823,10 +827,11 @@ server.add_route("GET", "/api/v1/meetings/:id/webrtc/signals",
             auto it = pending_signals.find(user_id);
             if (it != pending_signals.end()) {
                 user_signals = it->second;
-                pending_signals.erase(it);  // Clear after reading
+                pending_signals.erase(it);
             }
         }
         
+        // Serialize signals to JSON array
         std::vector<std::string> signal_jsons;
         for (const auto& sig : user_signals) {
             signal_jsons.push_back(serialize_signal(sig));
@@ -841,8 +846,9 @@ server.add_route("GET", "/api/v1/meetings/:id/webrtc/signals",
         }
         signals_array += "]";
         
+        // ✅ USE raw_field() FOR RAW JSON
         res.set_json_body(JSON::success(
-            JSON::field("signals", false)  
+            JSON::raw_field("signals", signals_array)
         ));
     });
 
@@ -927,6 +933,100 @@ server.add_route("POST", "/api/v1/meetings/:id/screenshare/stop",
         } else {
             res.set_status(400, "Bad Request");
             res.set_json_body(JSON::error("Failed to stop screen share"));
+        }
+    });
+
+    // Add this route AFTER the existing screenshare routes in main.cpp
+
+// POST /api/v1/meetings/:id/screenshare/frame
+// Upload screen share frame (JPEG data)
+server.add_route("POST", "/api/v1/meetings/:id/screenshare/frame",
+    [&auth_manager, &screen_share_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+        
+        uint64_t meeting_id = std::stoull(req.path_params.at("id"));
+        
+        try {
+            auto data = JSON::parse(req.body);
+            
+            // Get base64 JPEG data
+            std::string base64_jpeg = data["frame"];
+            uint32_t width = 0;
+            uint32_t height = 0;
+            
+            if (data.find("width") != data.end() && !data["width"].empty()) {
+                width = std::stoul(data["width"]);
+            }
+            if (data.find("height") != data.end() && !data["height"].empty()) {
+                height = std::stoul(data["height"]);
+            }
+            
+            if (base64_jpeg.empty()) {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error("Frame data is required"));
+                return;
+            }
+            
+            // Decode base64 to JPEG bytes
+            std::vector<uint8_t> jpeg_data = decode_base64(base64_jpeg);
+            
+            if (jpeg_data.empty()) {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error("Failed to decode frame data"));
+                return;
+            }
+            
+            // Upload frame to ScreenShareManager
+            if (screen_share_manager.upload_frame(meeting_id, user_id, jpeg_data, width, height)) {
+                res.set_json_body(JSON::success(
+                    JSON::field("message", "Frame uploaded") + "," +
+                    JSON::field("size", jpeg_data.size())
+                ));
+            } else {
+                res.set_status(400, "Bad Request");
+                res.set_json_body(JSON::error("Failed to upload frame. Start screen share first."));
+            }
+            
+        } catch (const std::exception& e) {
+            res.set_status(400, "Bad Request");
+            res.set_json_body(JSON::error(std::string("Invalid request: ") + e.what()));
+        }
+    });
+
+// GET /api/v1/meetings/:id/screenshare/frame
+// Get latest screen share frame
+server.add_route("GET", "/api/v1/meetings/:id/screenshare/frame",
+    [&auth_manager, &screen_share_manager](const HTTPRequest& req, HTTPResponse& res) {
+        uint64_t user_id;
+        if (!auth_manager.verify_token(req.auth_token, user_id)) {
+            res.set_status(401, "Unauthorized");
+            res.set_json_body(JSON::error("Invalid or expired token"));
+            return;
+        }
+        
+        uint64_t meeting_id = std::stoull(req.path_params.at("id"));
+        
+        ScreenFrame frame;
+        if (screen_share_manager.get_latest_frame(meeting_id, frame)) {
+            // Encode JPEG to base64 for JSON transport
+            std::string base64_jpeg = encode_base64(frame.jpeg_data);
+            
+            res.set_json_body(JSON::success(
+                JSON::field("frame", base64_jpeg) + "," +
+                JSON::field("width", static_cast<uint64_t>(frame.width)) + "," +
+                JSON::field("height", static_cast<uint64_t>(frame.height)) + "," +
+                JSON::field("timestamp", frame.timestamp) + "," +
+                JSON::field("user_id", frame.user_id) + "," +
+                JSON::field("username", frame.username)
+            ));
+        } else {
+            res.set_status(404, "Not Found");
+            res.set_json_body(JSON::error("No active screen share"));
         }
     });
 

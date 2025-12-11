@@ -44,14 +44,21 @@ export default function Lobby() {
 
     try {
       const data = await api.createMeeting(meetingTitle);
+      
       if (data.success) {
-        alert(`Meeting created!\n\nCode: ${data.meeting.meeting_code}\n\nShare this code with others.`);
+        // Parse meeting if it's a string (backend double-encodes it)
+        const meeting = typeof data.meeting === 'string' 
+          ? JSON.parse(data.meeting) 
+          : data.meeting;
+        
+        alert(`Meeting created!\n\nCode: ${meeting.meeting_code}\n\nShare this code with others.`);
         setMeetingTitle('');
         loadMeetings();
       } else {
         alert('Error: ' + data.error);
       }
     } catch (error) {
+      console.error('Create meeting error:', error);
       alert('Connection error');
     }
   };
