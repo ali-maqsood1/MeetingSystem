@@ -9,7 +9,7 @@ struct WhiteboardElement {
     uint64_t element_id;
     uint64_t meeting_id;
     uint64_t user_id;
-    uint8_t element_type;    // 0=line, 1=rect, 2=circle, 3=text
+    uint8_t element_type;    // 0=line, 1=rect, 2=circle, 3=text, 4=triangle, 5=arrow, 6=star
     int16_t x1, y1, x2, y2;  // Coordinates
     uint8_t color_r, color_g, color_b;
     uint16_t stroke_width;

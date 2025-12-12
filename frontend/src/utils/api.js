@@ -107,7 +107,27 @@ export const api = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(element)
+      body: JSON.stringify({
+        element_type: element.element_type,
+        x1: element.x1,
+        y1: element.y1,
+        x2: element.x2,
+        y2: element.y2,
+        color_r: element.color_r,    // <-- Send as-is
+        color_g: element.color_g,    // <-- Send as-is  
+        color_b: element.color_b,    // <-- Send as-is
+        stroke_width: element.stroke_width,
+        text: element.text || ''
+      })
+    });
+    return response.json();
+  },
+
+  deleteWhiteboardElement: async (meetingId, elementId) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/meetings/${meetingId}/whiteboard/elements/${elementId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     return response.json();
   },
@@ -138,9 +158,9 @@ export const api = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         filename: filename,
-        data: base64Data 
+        data: base64Data
       })
     });
     return response.json();
