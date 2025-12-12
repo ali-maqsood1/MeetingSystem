@@ -705,7 +705,7 @@ int main(int argc, char *argv[])
 
         // DELETE /api/v1/meetings/:id/files/:file_id
         server.add_route("DELETE", "/api/v1/meetings/:id/files/:file_id",
-                         [&auth_manager, &file_manager](const HTTPRequest &req, HTTPResponse &res)
+                         [&auth_manager, &file_manager, &meeting_manager](const HTTPRequest &req, HTTPResponse &res)
                          {
                              uint64_t user_id;
                              if (!auth_manager.verify_token(req.auth_token, user_id))
@@ -717,24 +717,34 @@ int main(int argc, char *argv[])
 
                              try
                              {
+                                 uint64_t meeting_id = std::stoull(req.path_params.at("id"));
                                  uint64_t file_id = std::stoull(req.path_params.at("file_id"));
 
+                                 // Get meeting info to check creator
+                                 Meeting meeting;
+                                 if (!meeting_manager.get_meeting(meeting_id, meeting))
+                                 {
+                                     res.set_status(404, "Not Found");
+                                     res.set_json_body(JSON::error("Meeting not found"));
+                                     return;
+                                 }
+
                                  std::string error;
-                                 if (file_manager.delete_file(file_id, error))
+                                 if (file_manager.delete_file(file_id, user_id, meeting_id, meeting.creator_id, error))
                                  {
                                      res.set_json_body(JSON::success(
                                          JSON::field("message", "File deleted successfully")));
                                  }
                                  else
                                  {
-                                     res.set_status(400, "Bad Request");
+                                     res.set_status(403, "Forbidden");
                                      res.set_json_body(JSON::error(error));
                                  }
                              }
                              catch (const std::exception &e)
                              {
                                  res.set_status(400, "Bad Request");
-                                 res.set_json_body(JSON::error("Invalid file ID"));
+                                 res.set_json_body(JSON::error("Invalid meeting or file ID"));
                              }
                          });
 
