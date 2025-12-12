@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -Wextra -O2 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/meeting_server.dir/src/main.cpp.o -o meeting_server  libstorage.a libserver.a libmanagers.a libstorage.a
