@@ -1,1 +1,26 @@
-build/meeting_system.db
+# Build directories
+build/
+MeetingSystem/build/
+
+# Database files
+*.db
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled binaries
+meeting_server
+test_storage
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

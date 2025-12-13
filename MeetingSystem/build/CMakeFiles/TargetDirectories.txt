@@ -1,7 +1,0 @@
-/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles/storage.dir
-/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles/test_storage.dir
-/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles/server.dir
-/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles/managers.dir
-/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles/meeting_server.dir
-/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles/edit_cache.dir
-/home/ali/Documents/DSA/final_project/ver_1/MeetingSystem/build/CMakeFiles/rebuild_cache.dir

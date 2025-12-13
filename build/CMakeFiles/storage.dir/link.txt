@@ -1,2 +1,0 @@
-/usr/bin/ar qc libstorage.a CMakeFiles/storage.dir/src/storage/DatabaseEngine.cpp.o CMakeFiles/storage.dir/src/storage/BTree.cpp.o CMakeFiles/storage.dir/src/storage/HashTable.cpp.o
-/usr/bin/ranlib libstorage.a

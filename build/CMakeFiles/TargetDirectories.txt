@@ -1,7 +1,0 @@
-/Users/alimaqsood/Desktop/MeetingSystem/build/CMakeFiles/storage.dir
-/Users/alimaqsood/Desktop/MeetingSystem/build/CMakeFiles/test_storage.dir
-/Users/alimaqsood/Desktop/MeetingSystem/build/CMakeFiles/server.dir
-/Users/alimaqsood/Desktop/MeetingSystem/build/CMakeFiles/managers.dir
-/Users/alimaqsood/Desktop/MeetingSystem/build/CMakeFiles/meeting_server.dir
-/Users/alimaqsood/Desktop/MeetingSystem/build/CMakeFiles/edit_cache.dir
-/Users/alimaqsood/Desktop/MeetingSystem/build/CMakeFiles/rebuild_cache.dir
