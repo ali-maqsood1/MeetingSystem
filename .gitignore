@@ -24,3 +24,5 @@ test_storage
 .idea/
 *.swp
 *.swo
+
+CHAT_OPTIMIZATIONS.md

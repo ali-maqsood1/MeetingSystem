@@ -1,4 +1,23 @@
-const API_URL = 'http://localhost:8080/api/v1';
+// Use environment variable if available, otherwise construct from current host
+// For development: VITE_API_URL=http://192.168.1.X:8080/api/v1
+// For production/network access: Will use window.location.hostname
+const getApiUrl = () => {
+  // Check if environment variable is set
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  // Use localhost for development, or current hostname for network access
+  const hostname = window.location.hostname === 'localhost'
+    ? 'localhost'
+    : window.location.hostname;
+
+  return `http://${hostname}:8080/api/v1`;
+};
+
+const API_URL = getApiUrl();
+
+console.log('API URL:', API_URL);
 
 export const getToken = () => sessionStorage.getItem('token');
 export const getUsername = () => sessionStorage.getItem('username');

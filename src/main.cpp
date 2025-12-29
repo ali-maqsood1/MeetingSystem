@@ -489,7 +489,30 @@ int main(int argc, char *argv[])
                              if (!success)
                                  return;
 
-                             auto messages = chat_manager.get_messages(meeting_id, 50);
+                             // 🔥 LONG POLLING: Check for since parameter
+                             std::vector<Message> messages;
+
+                             auto since_it = req.query_params.find("since");
+                             if (since_it != req.query_params.end())
+                             {
+                                 // Long polling mode
+                                 uint64_t since_timestamp = std::stoull(since_it->second);
+                                 int timeout = 20; // Default 20 seconds
+
+                                 auto timeout_it = req.query_params.find("timeout");
+                                 if (timeout_it != req.query_params.end())
+                                 {
+                                     timeout = std::stoi(timeout_it->second);
+                                     timeout = std::min(30, std::max(1, timeout)); // Clamp 1-30s
+                                 }
+
+                                 messages = chat_manager.wait_for_messages(meeting_id, since_timestamp, timeout);
+                             }
+                             else
+                             {
+                                 // Normal mode
+                                 messages = chat_manager.get_messages(meeting_id, 50);
+                             }
 
                              std::vector<std::string> message_objects;
                              for (const auto &msg : messages)
