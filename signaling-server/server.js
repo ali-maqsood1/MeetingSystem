@@ -1,21 +1,16 @@
 const express = require('express');
-const { createServer } = require('https');
-const { readFileSync } = require('fs');
+const { createServer } = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const app = express();
 
-// Load SSL certificates
-const httpsOptions = {
-    key: readFileSync(path.join(__dirname, '..', 'certs', 'key.pem')),
-    cert: readFileSync(path.join(__dirname, '..', 'certs', 'cert.pem'))
-};
+// In production (Render/Railway), use HTTP - they provide HTTPS via reverse proxy
+// In development, we used HTTPS directly
+const httpServer = createServer(app);
 
-const httpsServer = createServer(httpsOptions, app);
-const io = new Server(httpsServer, {
+const io = new Server(httpServer, {
     cors: {
-        origin: ["https://localhost:5173", "http://localhost:5173", "https://192.168.*:5173"], // Frontend ports
+        origin: true, // Allow all origins in production (configure specific domains if needed)
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -143,8 +138,9 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 8181;
-httpsServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n✅ WebRTC Signaling Server running on https://0.0.0.0:${PORT}`);
-    console.log(`   CORS enabled for HTTPS connections`);
+httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n✅ WebRTC Signaling Server running on port ${PORT}`);
+    console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`   CORS: Enabled for all origins`);
     console.log(`   Ready to handle WebRTC signaling!\n`);
 });

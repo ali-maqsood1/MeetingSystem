@@ -8,7 +8,7 @@ import {
   Monitor,
   PhoneOff,
   User,
-  MoreVertical
+  MoreVertical,
 } from 'lucide-react';
 
 const VideoPanel = ({ meetingId, userId, username }) => {
@@ -30,11 +30,18 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
   const isPolite = (remoteId) => String(userId) < String(remoteId);
 
-  // Use HTTPS for signaling server (required for network access)
-  const SIGNALING_SERVER =
-    window.location.protocol === 'https:'
-      ? `https://${window.location.hostname}:8181`
-      : 'http://localhost:8181';
+  // Use environment variable for signaling server, or construct from hostname
+  const getSignalingUrl = () => {
+    if (import.meta.env.VITE_SIGNALING_URL) {
+      return import.meta.env.VITE_SIGNALING_URL;
+    }
+    // For local development
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:8181`;
+  };
+
+  const SIGNALING_SERVER = getSignalingUrl();
 
   const ICE_SERVERS = {
     iceServers: [
@@ -69,7 +76,7 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       'userJoinedCall',
       async ({ userId: remoteUserId, username: remoteUsername }) => {
         console.log(`👤 ${remoteUsername} joined the call`);
-        setParticipants(prev => {
+        setParticipants((prev) => {
           const newMap = new Map(prev);
           newMap.set(remoteUserId, remoteUsername);
           return newMap;
@@ -80,7 +87,7 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
     newSocket.on('userLeftCall', ({ userId: remoteUserId }) => {
       console.log(`👋 User ${remoteUserId} left the call`);
-      setParticipants(prev => {
+      setParticipants((prev) => {
         const newMap = new Map(prev);
         newMap.delete(remoteUserId);
         return newMap;
@@ -100,7 +107,10 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
         } catch (err) {
-          console.error(`❌ Error setting remote answer for ${fromUserId}:`, err);
+          console.error(
+            `❌ Error setting remote answer for ${fromUserId}:`,
+            err
+          );
         }
       }
     });
@@ -498,8 +508,12 @@ const VideoPanel = ({ meetingId, userId, username }) => {
               <Video className='w-12 h-12 text-primary-500' />
             </div>
             <div>
-              <h2 className='text-3xl font-extrabold tracking-tight'>Ready to join?</h2>
-              <p className='text-gray-400 mt-1'>No one will see you until you join the call.</p>
+              <h2 className='text-3xl font-extrabold tracking-tight'>
+                Ready to join?
+              </h2>
+              <p className='text-gray-400 mt-1'>
+                No one will see you until you join the call.
+              </p>
             </div>
             <button
               onClick={joinCall}
@@ -509,14 +523,20 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             </button>
           </div>
         ) : (
-          <div className={`grid gap-4 h-full content-center ${participants.size + 1 === 1 ? 'grid-cols-1' :
-            participants.size + 1 === 2 ? 'grid-cols-1 md:grid-cols-2' :
-              participants.size + 1 <= 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2' :
-                'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
+          <div
+            className={`grid gap-4 h-full content-center ${
+              participants.size + 1 === 1
+                ? 'grid-cols-1'
+                : participants.size + 1 === 2
+                ? 'grid-cols-1 md:grid-cols-2'
+                : participants.size + 1 <= 4
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}
+          >
             {/* Local Video Tile */}
             <div className='relative aspect-video bg-dark-800 rounded-3xl overflow-hidden border border-white/5 shadow-2xl group'>
-              {(cameraEnabled || screenEnabled) ? (
+              {cameraEnabled || screenEnabled ? (
                 <video
                   ref={localVideoRef}
                   autoPlay
@@ -527,7 +547,9 @@ const VideoPanel = ({ meetingId, userId, username }) => {
               ) : (
                 <div className='w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-dark-800 to-dark-900'>
                   <div className='w-20 h-20 bg-primary-600/20 rounded-full flex items-center justify-center border-2 border-primary-500/30 mb-3'>
-                    <span className='text-2xl font-bold text-primary-400'>{username?.[0]?.toUpperCase()}</span>
+                    <span className='text-2xl font-bold text-primary-400'>
+                      {username?.[0]?.toUpperCase()}
+                    </span>
                   </div>
                   <span className='text-gray-400 font-medium'>You</span>
                 </div>
@@ -535,19 +557,25 @@ const VideoPanel = ({ meetingId, userId, username }) => {
               <div className='absolute bottom-4 left-4 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-semibold border border-white/10'>
                 {!micEnabled && <MicOff className='w-3.5 h-3.5 text-red-400' />}
                 <span>You</span>
-                {screenEnabled && <span className='text-primary-400 opacity-80'>(Sharing Screen)</span>}
+                {screenEnabled && (
+                  <span className='text-primary-400 opacity-80'>
+                    (Sharing Screen)
+                  </span>
+                )}
               </div>
             </div>
 
             {/* Remote Video Tiles */}
-            {Array.from(participants.entries()).map(([remoteUserId, remoteUsername]) => (
-              <RemoteTile
-                key={remoteUserId}
-                userId={remoteUserId}
-                username={remoteUsername}
-                stream={remoteStreams.get(remoteUserId)}
-              />
-            ))}
+            {Array.from(participants.entries()).map(
+              ([remoteUserId, remoteUsername]) => (
+                <RemoteTile
+                  key={remoteUserId}
+                  userId={remoteUserId}
+                  username={remoteUsername}
+                  stream={remoteStreams.get(remoteUserId)}
+                />
+              )
+            )}
           </div>
         )}
       </div>
@@ -556,36 +584,51 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       {inCall && (
         <div className='fixed bottom-0 left-0 right-0 h-24 bg-dark-900/80 backdrop-blur-xl border-t border-white/5 flex items-center justify-between px-8 z-50'>
           <div className='hidden md:flex items-center gap-2'>
-            <span className='text-sm font-semibold text-gray-300'>{meetingId}</span>
+            <span className='text-sm font-semibold text-gray-300'>
+              {meetingId}
+            </span>
             <div className='w-1 h-1 bg-gray-500 rounded-full' />
-            <span className='text-sm font-medium text-gray-500 uppercase tracking-widest'>{participants.size + 1} People</span>
+            <span className='text-sm font-medium text-gray-500 uppercase tracking-widest'>
+              {participants.size + 1} People
+            </span>
           </div>
 
           <div className='flex items-center gap-4'>
             <button
               onClick={toggleMic}
-              className={`p-4 rounded-full transition-all duration-300 border ${micEnabled
-                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
-                }`}
+              className={`p-4 rounded-full transition-all duration-300 border ${
+                micEnabled
+                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+              }`}
             >
-              {micEnabled ? <Mic className='w-6 h-6' /> : <MicOff className='w-6 h-6' />}
+              {micEnabled ? (
+                <Mic className='w-6 h-6' />
+              ) : (
+                <MicOff className='w-6 h-6' />
+              )}
             </button>
             <button
               onClick={toggleCamera}
-              className={`p-4 rounded-full transition-all duration-300 border ${cameraEnabled
-                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
-                }`}
+              className={`p-4 rounded-full transition-all duration-300 border ${
+                cameraEnabled
+                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+              }`}
             >
-              {cameraEnabled ? <Video className='w-6 h-6' /> : <VideoOff className='w-6 h-6' />}
+              {cameraEnabled ? (
+                <Video className='w-6 h-6' />
+              ) : (
+                <VideoOff className='w-6 h-6' />
+              )}
             </button>
             <button
               onClick={toggleScreen}
-              className={`p-4 rounded-full transition-all duration-300 border ${screenEnabled
-                ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
-                : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                }`}
+              className={`p-4 rounded-full transition-all duration-300 border ${
+                screenEnabled
+                  ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
+                  : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+              }`}
             >
               <Monitor className='w-6 h-6' />
             </button>
@@ -630,9 +673,13 @@ const RemoteTile = ({ userId, username, stream }) => {
       ) : (
         <div className='w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-dark-800 to-dark-900'>
           <div className='w-20 h-20 bg-indigo-600/20 rounded-full flex items-center justify-center border-2 border-indigo-500/30 mb-3'>
-            <span className='text-2xl font-bold text-indigo-400'>{username?.[0]?.toUpperCase() || <User className='w-10 h-10' />}</span>
+            <span className='text-2xl font-bold text-indigo-400'>
+              {username?.[0]?.toUpperCase() || <User className='w-10 h-10' />}
+            </span>
           </div>
-          <span className='text-gray-400 font-medium'>{username || `Participant ${userId}`}</span>
+          <span className='text-gray-400 font-medium'>
+            {username || `Participant ${userId}`}
+          </span>
         </div>
       )}
       <div className='absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-semibold border border-white/10'>
