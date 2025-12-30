@@ -23,6 +23,8 @@ export default function FilesPanel({
   const [selectedFile, setSelectedFile] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const username = getUsername();
@@ -82,13 +84,30 @@ export default function FilesPanel({
 
     setUploading(true);
     setError(null);
+    setUploadProgress(0);
+    setUploadStatus('Preparing file...');
 
     try {
       // Read file as base64
       const reader = new FileReader();
+
+      // Show encoding progress
+      reader.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const progress = Math.round((e.loaded / e.total) * 30); // 0-30%
+          setUploadProgress(progress);
+        }
+      };
+
       reader.onload = async (e) => {
         try {
+          setUploadProgress(35);
+          setUploadStatus('Encoding file...');
+
           const base64Data = e.target.result.split(',')[1];
+
+          setUploadProgress(50);
+          setUploadStatus('Uploading to server...');
 
           const data = await api.uploadFile(
             meetingId,
@@ -96,13 +115,24 @@ export default function FilesPanel({
             base64Data
           );
 
+          setUploadProgress(90);
+          setUploadStatus('Processing...');
+
           if (data.success) {
+            setUploadProgress(100);
+            setUploadStatus('Upload complete!');
+
+            // Brief success message
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
             // Reset file input BEFORE closing modal
             const fileInput = document.getElementById('file-upload');
             if (fileInput) fileInput.value = '';
 
             setSelectedFile(null);
             setShowUploadModal(false);
+            setUploadProgress(0);
+            setUploadStatus('');
             await loadFiles();
           } else {
             setError(data.error || 'Upload failed');
@@ -357,6 +387,22 @@ export default function FilesPanel({
                 </p>
               )}
             </div>
+
+            {/* Upload Progress Bar */}
+            {uploading && (
+              <div className='mb-4'>
+                <div className='flex justify-between text-sm mb-2'>
+                  <span className='text-gray-400'>{uploadStatus}</span>
+                  <span className='text-primary-400'>{uploadProgress}%</span>
+                </div>
+                <div className='h-2 bg-dark-700 rounded-full overflow-hidden'>
+                  <div
+                    className='h-full bg-gradient-to-r from-primary-500 to-primary-400 transition-all duration-300 ease-out'
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className='flex gap-3'>

@@ -161,7 +161,13 @@ export default function Meeting() {
               meetingCreatorId={meetingCreatorId}
             />
           )}
-          {activePanel === 'video' && <VideoPanel meetingId={meetingId} />}
+          {activePanel === 'video' && (
+            <VideoPanel
+              meetingId={meetingId}
+              userId={currentUserId}
+              username={getUsername()}
+            />
+          )}
         </main>
       </div>
     </div>

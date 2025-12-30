@@ -3,6 +3,42 @@
 #include <ctime>
 #include <algorithm>
 
+void WhiteboardManager::persistence_worker()
+{
+    while (!stop_persistence_thread)
+    {
+        std::unique_lock<std::mutex> lock(queue_mutex);
+        queue_cv.wait(lock, [this]
+                      { return !persistence_queue.empty() || stop_persistence_thread; });
+
+        if (stop_persistence_thread && persistence_queue.empty())
+        {
+            break;
+        }
+
+        if (!persistence_queue.empty())
+        {
+            WhiteboardElement element = persistence_queue.front();
+            persistence_queue.pop();
+            lock.unlock();
+
+            // Store to disk
+            store_element(element);
+        }
+    }
+
+    // Flush remaining queue
+    std::unique_lock<std::mutex> lock(queue_mutex);
+    while (!persistence_queue.empty())
+    {
+        WhiteboardElement element = persistence_queue.front();
+        persistence_queue.pop();
+        lock.unlock();
+        store_element(element);
+        lock.lock();
+    }
+}
+
 bool WhiteboardManager::store_element(const WhiteboardElement &element)
 {
     // Allocate page for element
@@ -73,15 +109,25 @@ bool WhiteboardManager::draw_element(uint64_t meeting_id, uint64_t user_id,
 
     element.timestamp = std::time(nullptr);
 
-    // Store element
-    if (!store_element(element))
+    // Add to cache immediately
     {
-        error = "Failed to store whiteboard element";
-        return false;
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        auto &cache = meeting_elements_cache[meeting_id];
+        cache.push_back(element);
+
+        // Limit cache size
+        if (cache.size() > MAX_CACHE_SIZE)
+        {
+            cache.erase(cache.begin());
+        }
     }
 
-    // Save database header
-    db->write_header();
+    // Queue for async persistence
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex);
+        persistence_queue.push(element);
+        queue_cv.notify_one();
+    }
 
     out_element = element;
 
@@ -94,6 +140,26 @@ bool WhiteboardManager::draw_element(uint64_t meeting_id, uint64_t user_id,
 
 std::vector<WhiteboardElement> WhiteboardManager::get_meeting_elements(uint64_t meeting_id)
 {
+    // Try cache first
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        auto it = meeting_elements_cache.find(meeting_id);
+        if (it != meeting_elements_cache.end())
+        {
+            // Filter out deleted elements
+            std::vector<WhiteboardElement> active_elements;
+            for (const auto &elem : it->second)
+            {
+                if (elem.element_type != 255)
+                {
+                    active_elements.push_back(elem);
+                }
+            }
+            return active_elements;
+        }
+    }
+
+    // Cache miss - load from disk
     std::vector<WhiteboardElement> elements;
 
     auto locations = whiteboard_btree->range_search(1, UINT64_MAX);
@@ -104,7 +170,7 @@ std::vector<WhiteboardElement> WhiteboardManager::get_meeting_elements(uint64_t 
         WhiteboardElement element;
         element.deserialize(page.data + loc.offset);
 
-        if (element.meeting_id == meeting_id)
+        if (element.meeting_id == meeting_id && element.element_type != 255)
         {
             elements.push_back(element);
         }
@@ -116,6 +182,12 @@ std::vector<WhiteboardElement> WhiteboardManager::get_meeting_elements(uint64_t 
               {
                   return a.timestamp < b.timestamp;
               });
+
+    // Update cache
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        meeting_elements_cache[meeting_id] = elements;
+    }
 
     return elements;
 }
@@ -161,6 +233,12 @@ bool WhiteboardManager::clear_whiteboard(uint64_t meeting_id, std::string &error
         delete_element(element.element_id, error);
     }
 
+    // Clear cache
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        meeting_elements_cache[meeting_id].clear();
+    }
+
     std::cout << "Whiteboard cleared for meeting " << meeting_id
               << " (" << elements.size() << " elements)" << std::endl;
 
@@ -178,6 +256,23 @@ bool WhiteboardManager::delete_element(uint64_t element_id, std::string &error)
 
     // Mark as deleted by setting element_type to invalid value
     element.element_type = 255; // Deleted marker
+
+    // Update cache
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+        auto it = meeting_elements_cache.find(element.meeting_id);
+        if (it != meeting_elements_cache.end())
+        {
+            for (auto &elem : it->second)
+            {
+                if (elem.element_id == element_id)
+                {
+                    elem.element_type = 255;
+                    break;
+                }
+            }
+        }
+    }
 
     // Update in database
     bool found;

@@ -7,7 +7,6 @@
 #include "managers/ChatManager.h"
 #include "managers/FileManager.h"
 #include "managers/WhiteboardManager.h"
-#include "managers/ScreenShareManager.h"
 #include "utils/JSON.h"
 #include <utils/Hash.h>
 #include <iostream>
@@ -189,8 +188,7 @@ int main(int argc, char *argv[])
         ChatManager chat_manager(&db, &messages_btree, &chat_search_hash);
         FileManager file_manager(&db, &files_btree, &file_dedup_hash);
         WhiteboardManager whiteboard_manager(&db, &whiteboard_btree);
-        ScreenShareManager screen_share_manager;
-        std::cout << "  All managers initialized (6 total)" << std::endl;
+        std::cout << "  All managers initialized (5 total)" << std::endl;
 
         // Create HTTP Server
         std::cout << "\n[5/6] Setting up HTTP routes..." << std::endl;
@@ -1105,173 +1103,6 @@ int main(int argc, char *argv[])
 
                              res.set_json_body(JSON::success(
                                  JSON::field("participants", JSON::array(participant_objects))));
-                         });
-
-        // ============ SCREEN SHARE ROUTES ============
-
-        // POST /api/v1/meetings/:id/screenshare/start
-        server.add_route("POST", "/api/v1/meetings/:id/screenshare/start",
-                         [&auth_manager, &screen_share_manager](const HTTPRequest &req, HTTPResponse &res)
-                         {
-                             uint64_t user_id;
-                             if (!auth_manager.verify_token(req.auth_token, user_id))
-                             {
-                                 res.set_status(401, "Unauthorized");
-                                 res.set_json_body(JSON::error("Invalid or expired token"));
-                                 return;
-                             }
-
-                             uint64_t meeting_id = std::stoull(req.path_params.at("id"));
-
-                             User user;
-                             auth_manager.get_user_by_id(user_id, user);
-
-                             std::string stream_id;
-                             if (screen_share_manager.start_screen_share(meeting_id, user_id, user.username, stream_id))
-                             {
-                                 res.set_json_body(JSON::success(
-                                     JSON::field("stream_id", stream_id) + "," +
-                                     JSON::field("upload_url", "ws://localhost:8081/screenshare/upload/" + stream_id)));
-                             }
-                             else
-                             {
-                                 res.set_status(400, "Bad Request");
-                                 res.set_json_body(JSON::error("Failed to start screen share"));
-                             }
-                         });
-
-        // POST /api/v1/meetings/:id/screenshare/stop
-        server.add_route("POST", "/api/v1/meetings/:id/screenshare/stop",
-                         [&auth_manager, &screen_share_manager](const HTTPRequest &req, HTTPResponse &res)
-                         {
-                             uint64_t user_id;
-                             if (!auth_manager.verify_token(req.auth_token, user_id))
-                             {
-                                 res.set_status(401, "Unauthorized");
-                                 res.set_json_body(JSON::error("Invalid or expired token"));
-                                 return;
-                             }
-
-                             uint64_t meeting_id = std::stoull(req.path_params.at("id"));
-
-                             if (screen_share_manager.stop_screen_share(meeting_id, user_id))
-                             {
-                                 res.set_json_body(JSON::success(
-                                     JSON::field("message", "Screen share stopped")));
-                             }
-                             else
-                             {
-                                 res.set_status(400, "Bad Request");
-                                 res.set_json_body(JSON::error("Failed to stop screen share"));
-                             }
-                         });
-
-        // Add this route AFTER the existing screenshare routes in main.cpp
-
-        // POST /api/v1/meetings/:id/screenshare/frame
-        // Upload screen share frame (JPEG data)
-        server.add_route("POST", "/api/v1/meetings/:id/screenshare/frame",
-                         [&auth_manager, &screen_share_manager](const HTTPRequest &req, HTTPResponse &res)
-                         {
-                             uint64_t user_id;
-                             if (!auth_manager.verify_token(req.auth_token, user_id))
-                             {
-                                 res.set_status(401, "Unauthorized");
-                                 res.set_json_body(JSON::error("Invalid or expired token"));
-                                 return;
-                             }
-
-                             uint64_t meeting_id = std::stoull(req.path_params.at("id"));
-
-                             try
-                             {
-                                 auto data = JSON::parse(req.body);
-
-                                 // Get base64 JPEG data
-                                 std::string base64_jpeg = data["frame"];
-                                 uint32_t width = 0;
-                                 uint32_t height = 0;
-
-                                 if (data.find("width") != data.end() && !data["width"].empty())
-                                 {
-                                     width = std::stoul(data["width"]);
-                                 }
-                                 if (data.find("height") != data.end() && !data["height"].empty())
-                                 {
-                                     height = std::stoul(data["height"]);
-                                 }
-
-                                 if (base64_jpeg.empty())
-                                 {
-                                     res.set_status(400, "Bad Request");
-                                     res.set_json_body(JSON::error("Frame data is required"));
-                                     return;
-                                 }
-
-                                 // Decode base64 to JPEG bytes
-                                 std::vector<uint8_t> jpeg_data = decode_base64(base64_jpeg);
-
-                                 if (jpeg_data.empty())
-                                 {
-                                     res.set_status(400, "Bad Request");
-                                     res.set_json_body(JSON::error("Failed to decode frame data"));
-                                     return;
-                                 }
-
-                                 // Upload frame to ScreenShareManager
-                                 if (screen_share_manager.upload_frame(meeting_id, user_id, jpeg_data, width, height))
-                                 {
-                                     res.set_json_body(JSON::success(
-                                         JSON::field("message", "Frame uploaded") + "," +
-                                         JSON::field("size", static_cast<uint64_t>(jpeg_data.size()))));
-                                 }
-                                 else
-                                 {
-                                     res.set_status(400, "Bad Request");
-                                     res.set_json_body(JSON::error("Failed to upload frame. Start screen share first."));
-                                 }
-                             }
-                             catch (const std::exception &e)
-                             {
-                                 res.set_status(400, "Bad Request");
-                                 res.set_json_body(JSON::error(std::string("Invalid request: ") + e.what()));
-                             }
-                         });
-
-        // GET /api/v1/meetings/:id/screenshare/frame
-        // Get latest screen share frame
-        server.add_route("GET", "/api/v1/meetings/:id/screenshare/frame",
-                         [&auth_manager, &screen_share_manager](const HTTPRequest &req, HTTPResponse &res)
-                         {
-                             uint64_t user_id;
-                             if (!auth_manager.verify_token(req.auth_token, user_id))
-                             {
-                                 res.set_status(401, "Unauthorized");
-                                 res.set_json_body(JSON::error("Invalid or expired token"));
-                                 return;
-                             }
-
-                             uint64_t meeting_id = std::stoull(req.path_params.at("id"));
-
-                             ScreenFrame frame;
-                             if (screen_share_manager.get_latest_frame(meeting_id, frame))
-                             {
-                                 // Encode JPEG to base64 for JSON transport
-                                 std::string base64_jpeg = encode_base64(frame.jpeg_data);
-
-                                 res.set_json_body(JSON::success(
-                                     JSON::field("frame", base64_jpeg) + "," +
-                                     JSON::field("width", static_cast<uint64_t>(frame.width)) + "," +
-                                     JSON::field("height", static_cast<uint64_t>(frame.height)) + "," +
-                                     JSON::field("timestamp", frame.timestamp) + "," +
-                                     JSON::field("user_id", frame.user_id) + "," +
-                                     JSON::field("username", frame.username)));
-                             }
-                             else
-                             {
-                                 res.set_status(404, "Not Found");
-                                 res.set_json_body(JSON::error("No active screen share"));
-                             }
                          });
 
         // DELETE /api/v1/meetings/:id/whiteboard/clear

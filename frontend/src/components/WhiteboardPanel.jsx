@@ -51,7 +51,7 @@ export default function WhiteboardPanel({ meetingId }) {
 
   useEffect(() => {
     loadWhiteboard();
-    const interval = setInterval(loadWhiteboard, 3000);
+    const interval = setInterval(loadWhiteboard, 500); // Reduced from 3000ms to 500ms
     return () => clearInterval(interval);
   }, [meetingId]);
 
@@ -61,16 +61,8 @@ export default function WhiteboardPanel({ meetingId }) {
     elements,
     zoom,
     pan,
-    isDrawing,
-    currentPos,
-    currentTool,
-    currentColor,
-    brushSize,
-    fillEnabled,
-    startPos,
-    isAddingText,
-    textPos,
-    textInput,
+    // Removed frequently changing values to reduce re-renders
+    // isDrawing, currentPos, startPos are handled by renderWhiteboard directly
   ]);
 
   const loadWhiteboard = async () => {
@@ -96,7 +88,6 @@ export default function WhiteboardPanel({ meetingId }) {
     ctx.scale(zoom, zoom);
 
     elements.forEach((elem) => {
-      
       // Use ?? instead of || to allow 0 values (for black color: rgb(0,0,0))
       const r = elem.color_r !== undefined ? elem.color_r : 102;
       const g = elem.color_g !== undefined ? elem.color_g : 126;
@@ -433,6 +424,11 @@ export default function WhiteboardPanel({ meetingId }) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
       return;
     }
+
+    // Manual render trigger when drawing to show preview
+    if (isDrawing) {
+      renderWhiteboard();
+    }
   };
 
   const handleMouseUp = async (e) => {
@@ -465,6 +461,23 @@ export default function WhiteboardPanel({ meetingId }) {
 
     try {
       console.log('Sending color values:', { r, g, b, currentColor });
+
+      // Optimistic update - add element immediately
+      const optimisticElement = {
+        element_id: Date.now(), // Temporary ID
+        element_type: elementType,
+        x1: Math.floor(startPos.x),
+        y1: Math.floor(startPos.y),
+        x2: Math.floor(endPos.x),
+        y2: Math.floor(endPos.y),
+        color_r: r,
+        color_g: g,
+        color_b: b,
+        stroke_width: strokeWidth,
+        text: '',
+      };
+      setElements([...elements, optimisticElement]);
+
       await api.drawOnWhiteboard(meetingId, {
         element_type: elementType,
         x1: Math.floor(startPos.x),
@@ -477,9 +490,10 @@ export default function WhiteboardPanel({ meetingId }) {
         stroke_width: strokeWidth,
         text: '',
       });
-      await loadWhiteboard();
+      await loadWhiteboard(); // Refresh to get server element ID
     } catch (error) {
       console.error('Error drawing:', error);
+      await loadWhiteboard(); // Reload on error to remove optimistic element
     }
   };
 
@@ -495,6 +509,24 @@ export default function WhiteboardPanel({ meetingId }) {
     const b = parseInt(hex.substr(4, 2), 16);
 
     try {
+      // Optimistic update - add text element immediately
+      const optimisticElement = {
+        element_id: Date.now(), // Temporary ID
+        element_type: 3,
+        x1: Math.floor(textPos.x),
+        y1: Math.floor(textPos.y),
+        x2: 0,
+        y2: 0,
+        color_r: r,
+        color_g: g,
+        color_b: b,
+        stroke_width: fontSize,
+        text: textInput,
+      };
+      setElements([...elements, optimisticElement]);
+      setIsAddingText(false);
+      setTextInput('');
+
       await api.drawOnWhiteboard(meetingId, {
         element_type: 3,
         x1: Math.floor(textPos.x),
@@ -507,11 +539,10 @@ export default function WhiteboardPanel({ meetingId }) {
         stroke_width: fontSize,
         text: textInput,
       });
-      setIsAddingText(false);
-      setTextInput('');
-      await loadWhiteboard();
+      await loadWhiteboard(); // Refresh to get server element ID
     } catch (error) {
       console.error('Error saving text:', error);
+      await loadWhiteboard(); // Reload on error to remove optimistic element
     }
   };
 

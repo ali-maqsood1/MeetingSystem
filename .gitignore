@@ -26,3 +26,14 @@ test_storage
 *.swo
 
 CHAT_OPTIMIZATIONS.md
+
+camsetup.txt
+FILE_OPTIMIZATIONS_APPLIED.md
+FILE_UPLOAD_OPTIMIZATIONS.md
+
+README_WEBRTC.md
+WEBRTC_INTEGRATION_PLAN.md
+WHITEBOARD_OPTIMIZATIONS.md
+
+signaling-server/node_modules/
+

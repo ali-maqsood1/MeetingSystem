@@ -79,7 +79,6 @@ add_library(managers
     src/managers/ChatManager.cpp
     src/managers/FileManager.cpp
     src/managers/WhiteboardManager.cpp
-    src/managers/ScreenShareManager.cpp
     src/utils/Hash.cpp
 )
 
