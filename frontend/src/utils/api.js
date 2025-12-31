@@ -200,6 +200,15 @@ export const api = {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return response.json();
+  },
+
+  deleteMeeting: async (meetingId) => {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/meetings/${meetingId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
   }
 };
 

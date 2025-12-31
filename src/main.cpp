@@ -404,6 +404,7 @@ int main(int argc, char *argv[])
                                      JSON::field("meeting_id", meeting.meeting_id) + "," +
                                      JSON::field("title", meeting.title) + "," +
                                      JSON::field("meeting_code", meeting.meeting_code) + "," +
+                                     JSON::field("creator_id", meeting.creator_id) + "," +
                                      JSON::field("created_at", meeting.created_at) + "," +
                                      JSON::field("is_active", meeting.is_active)));
                              }
@@ -1103,6 +1104,40 @@ int main(int argc, char *argv[])
 
                              res.set_json_body(JSON::success(
                                  JSON::field("participants", JSON::array(participant_objects))));
+                         });
+
+        // DELETE /api/v1/meetings/:id
+        // Delete a meeting and all associated data (messages, files, whiteboard, participants)
+        server.add_route("DELETE", "/api/v1/meetings/:id",
+                         [&auth_manager, &meeting_manager, &chat_manager, &whiteboard_manager, &file_manager](const HTTPRequest &req, HTTPResponse &res)
+                         {
+                             uint64_t user_id;
+                             if (!auth_manager.verify_token(req.auth_token, user_id))
+                             {
+                                 res.set_status(401, "Unauthorized");
+                                 res.set_json_body(JSON::error("Invalid or expired token"));
+                                 return;
+                             }
+
+                             uint64_t meeting_id = std::stoull(req.path_params.at("id"));
+
+                             // Delete all associated data first
+                             chat_manager.delete_meeting_messages(meeting_id);
+                             whiteboard_manager.delete_meeting_elements(meeting_id);
+                             file_manager.delete_meeting_files(meeting_id);
+
+                             // Delete the meeting itself (checks ownership)
+                             std::string error;
+                             if (meeting_manager.delete_meeting(meeting_id, user_id, error))
+                             {
+                                 res.set_json_body(JSON::success(
+                                     JSON::field("message", "Meeting deleted successfully")));
+                             }
+                             else
+                             {
+                                 res.set_status(403, "Forbidden");
+                                 res.set_json_body(JSON::error(error));
+                             }
                          });
 
         // DELETE /api/v1/meetings/:id/whiteboard/clear

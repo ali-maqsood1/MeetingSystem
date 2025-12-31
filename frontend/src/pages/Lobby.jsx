@@ -11,8 +11,9 @@ import {
   ArrowRight,
   Sparkles,
   TrendingUp,
+  Trash2,
 } from 'lucide-react';
-import api, { getToken, getUsername } from '../utils/api';
+import api, { getToken, getUsername, getUserId } from '../utils/api';
 
 export default function Lobby() {
   const [meetings, setMeetings] = useState([]);
@@ -119,6 +120,29 @@ export default function Lobby() {
     await api.logout();
     sessionStorage.clear();
     navigate('/');
+  };
+
+  const deleteMeeting = async (meetingId, meetingTitle) => {
+    if (
+      !confirm(
+        `Delete "${meetingTitle}"?\n\nThis will permanently delete all messages, files, and whiteboard data.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const data = await api.deleteMeeting(meetingId);
+      if (data.success) {
+        alert('Meeting deleted successfully');
+        loadMeetings();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Delete meeting error:', error);
+      alert('Failed to delete meeting');
+    }
   };
 
   return (
@@ -284,20 +308,47 @@ export default function Lobby() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={() =>
-                          joinMeetingById(
-                            meeting.meeting_id,
+                      <div className='flex items-center gap-2'>
+                        {(() => {
+                          const isCreator =
+                            String(meeting.creator_id) === String(getUserId());
+                          console.log(
+                            'Meeting:',
                             meeting.title,
-                            meeting.meeting_code,
-                            meeting.creator_id
-                          )
-                        }
-                        className='px-4 py-2 bg-gradient-to-r from-primary-500 to-purple-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-primary-500/50 transition-all duration-300 flex items-center gap-2'
-                      >
-                        Join
-                        <ArrowRight className='w-4 h-4' />
-                      </button>
+                            'creator_id:',
+                            meeting.creator_id,
+                            'userId:',
+                            getUserId(),
+                            'isCreator:',
+                            isCreator
+                          );
+                          return isCreator;
+                        })() && (
+                          <button
+                            onClick={() =>
+                              deleteMeeting(meeting.meeting_id, meeting.title)
+                            }
+                            className='p-2 hover:bg-red-500/20 rounded-lg text-red-400 hover:text-red-300 transition-all duration-300'
+                            title='Delete meeting'
+                          >
+                            <Trash2 className='w-5 h-5' />
+                          </button>
+                        )}
+                        <button
+                          onClick={() =>
+                            joinMeetingById(
+                              meeting.meeting_id,
+                              meeting.title,
+                              meeting.meeting_code,
+                              meeting.creator_id
+                            )
+                          }
+                          className='px-4 py-2 bg-gradient-to-r from-primary-500 to-purple-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-primary-500/50 transition-all duration-300 flex items-center gap-2'
+                        >
+                          Join
+                          <ArrowRight className='w-4 h-4' />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))

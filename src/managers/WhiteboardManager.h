@@ -72,6 +72,9 @@ public:
     // Get element by ID
     bool get_element(uint64_t element_id, WhiteboardElement &out_element);
 
+    // Delete all elements for a meeting (cleanup when deleting meeting)
+    void delete_meeting_elements(uint64_t meeting_id);
+
 private:
     // Store whiteboard element
     bool store_element(const WhiteboardElement &element);

@@ -309,3 +309,28 @@ bool WhiteboardManager::get_element(uint64_t element_id, WhiteboardElement &out_
 
     return true;
 }
+
+void WhiteboardManager::delete_meeting_elements(uint64_t meeting_id)
+{
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    // Remove from cache
+    meeting_elements_cache.erase(meeting_id);
+
+    // Remove from database
+    auto locations = whiteboard_btree->range_search(1, UINT64_MAX);
+    for (const auto &loc : locations)
+    {
+        Page page = db->read_page(loc.page_id);
+        WhiteboardElement element;
+        element.deserialize(page.data + loc.offset);
+
+        if (element.meeting_id == meeting_id)
+        {
+            whiteboard_btree->remove(element.element_id);
+            db->free_page(loc.page_id);
+        }
+    }
+
+    std::cout << "🗑️  Deleted all whiteboard elements for meeting " << meeting_id << std::endl;
+}

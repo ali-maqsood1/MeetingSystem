@@ -72,6 +72,9 @@ public:
     // Get message count for meeting
     int get_message_count(uint64_t meeting_id);
 
+    // Delete all messages for a meeting (cleanup when deleting meeting)
+    void delete_meeting_messages(uint64_t meeting_id);
+
 private:
     // Background persistence worker
     void persistence_worker();

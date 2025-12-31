@@ -399,3 +399,37 @@ bool FileManager::file_exists_by_hash(const std::string &file_hash, FileRecord &
 
     return true;
 }
+
+void FileManager::delete_meeting_files(uint64_t meeting_id)
+{
+    // Find all files for this meeting and delete them
+    auto locations = files_btree->range_search(1, UINT64_MAX);
+    for (const auto &loc : locations)
+    {
+        Page page = db->read_page(loc.page_id);
+        FileRecord file;
+        file.deserialize(page.data + loc.offset);
+
+        if (file.meeting_id == meeting_id)
+        {
+            files_btree->remove(file.file_id);
+
+            // Free file data pages
+            uint64_t current_page = file.data_page_id;
+            size_t remaining = file.file_size;
+            while (current_page != 0 && remaining > 0)
+            {
+                Page data_page = db->read_page(current_page);
+                uint64_t next_page = *reinterpret_cast<uint64_t *>(data_page.data);
+                db->free_page(current_page);
+                current_page = next_page;
+                remaining = (remaining > 4000) ? remaining - 4000 : 0;
+            }
+
+            // Free record page
+            db->free_page(loc.page_id);
+        }
+    }
+
+    std::cout << "🗑️  Deleted all files for meeting " << meeting_id << std::endl;
+}

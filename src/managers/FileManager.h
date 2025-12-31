@@ -42,6 +42,9 @@ public:
     // Check if file exists by hash (deduplication)
     bool file_exists_by_hash(const std::string &file_hash, FileRecord &out_file);
 
+    // Delete all files for a meeting (cleanup when deleting meeting)
+    void delete_meeting_files(uint64_t meeting_id);
+
 private:
     // Calculate SHA-256-like hash
     std::string calculate_file_hash(const uint8_t *data, size_t size);

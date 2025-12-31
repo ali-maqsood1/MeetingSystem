@@ -484,3 +484,41 @@ int ChatManager::get_message_count(uint64_t meeting_id)
 
     return count;
 }
+
+void ChatManager::delete_meeting_messages(uint64_t meeting_id)
+{
+    std::lock_guard<std::mutex> lock(cache_mutex);
+
+    // Remove from cache
+    meeting_messages.erase(meeting_id);
+
+    // Remove individual messages from message_by_id cache
+    for (auto it = message_by_id.begin(); it != message_by_id.end();)
+    {
+        if (it->second.meeting_id == meeting_id)
+        {
+            it = message_by_id.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // Remove from database
+    auto locations = messages_btree->range_search(1, UINT64_MAX);
+    for (const auto &loc : locations)
+    {
+        Page page = db->read_page(loc.page_id);
+        Message message;
+        message.deserialize(page.data + loc.offset);
+
+        if (message.meeting_id == meeting_id)
+        {
+            messages_btree->remove(message.message_id);
+            db->free_page(loc.page_id);
+        }
+    }
+
+    std::cout << "🗑️  Deleted all messages for meeting " << meeting_id << std::endl;
+}
