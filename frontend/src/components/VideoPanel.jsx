@@ -796,60 +796,105 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 const RemoteTile = ({ userId, username, stream }) => {
   const videoRef = useRef(null);
   const [hasVideo, setHasVideo] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      console.log(
-        `🎬 [RemoteTile] Attaching stream for ${username}:`,
-        stream.id,
-        'Tracks:',
-        stream.getTracks().map((t) => `${t.kind}:${t.enabled}`)
-      );
-
-      const video = videoRef.current;
-      video.srcObject = stream;
-
-      const attemptPlay = () => {
-        video
-          .play()
-          .then(() =>
-            console.log(`✅ [RemoteTile] Playing video for ${username}`)
-          )
-          .catch((e) => {
-            console.error(`❌ [RemoteTile] Play error for ${username}:`, e);
-            setTimeout(attemptPlay, 500);
-          });
-      };
-
-      attemptPlay();
-
-      const checkTracks = () => {
-        const videoTracks = stream.getVideoTracks();
-        const hasVideoTrack = videoTracks.length > 0 && videoTracks[0].enabled;
-        console.log(
-          `📺 [RemoteTile] ${username} video tracks:`,
-          videoTracks.length,
-          'has video:',
-          hasVideoTrack
-        );
-        setHasVideo(hasVideoTrack);
-      };
-
-      checkTracks();
-      const interval = setInterval(checkTracks, 1000); // Check periodically
-
-      stream.onaddtrack = () => {
-        console.log(`➕ Track added to ${username}'s stream`);
-        checkTracks();
-      };
-      stream.onremovetrack = checkTracks;
-
-      return () => {
-        clearInterval(interval);
-        stream.onaddtrack = null;
-        stream.onremovetrack = null;
-      };
+    if (!stream) {
+      console.log(`⚠️ [RemoteTile] No stream for ${username}`);
+      setHasVideo(false);
+      return;
     }
+
+    console.log(
+      `🎬 [RemoteTile] Attaching stream for ${username}:`,
+      stream.id,
+      'Tracks:',
+      stream.getTracks().map((t) => `${t.kind}:${t.enabled}:${t.readyState}`)
+    );
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Set srcObject
+    video.srcObject = stream;
+    video.volume = 1.0;
+
+    const attemptPlay = async () => {
+      try {
+        await video.play();
+        console.log(`✅ [RemoteTile] Playing video for ${username}`);
+        setIsPlaying(true);
+      } catch (e) {
+        console.error(`❌ [RemoteTile] Play error for ${username}:`, e);
+        // Retry after a delay
+        setTimeout(attemptPlay, 500);
+      }
+    };
+
+    const checkTracks = () => {
+      const videoTracks = stream.getVideoTracks();
+      const hasVideoTrack = videoTracks.length > 0 && videoTracks[0].enabled && videoTracks[0].readyState === 'live';
+      console.log(
+        `📺 [RemoteTile] ${username} video tracks:`,
+        videoTracks.length,
+        'enabled:',
+        videoTracks[0]?.enabled,
+        'readyState:',
+        videoTracks[0]?.readyState,
+        'has video:',
+        hasVideoTrack
+      );
+      setHasVideo(hasVideoTrack);
+    };
+
+    // Event handlers
+    video.onloadedmetadata = () => {
+      console.log(`📽️ [RemoteTile] Metadata loaded for ${username}`);
+      checkTracks();
+      attemptPlay();
+    };
+
+    video.onloadeddata = () => {
+      console.log(`📼 [RemoteTile] Data loaded for ${username}`);
+      attemptPlay();
+    };
+
+    video.onplay = () => {
+      console.log(`▶️ [RemoteTile] Video playing for ${username}`);
+      setIsPlaying(true);
+    };
+
+    video.onpause = () => {
+      console.log(`⏸️ [RemoteTile] Video paused for ${username}`);
+      setIsPlaying(false);
+    };
+
+    // Check tracks immediately
+    checkTracks();
+    attemptPlay();
+
+    // Set up periodic checking
+    const interval = setInterval(checkTracks, 1000);
+
+    // Listen for track changes
+    const handleTrackAdded = (e) => {
+      console.log(`➕ [RemoteTile] Track added to ${username}'s stream:`, e.track.kind);
+      checkTracks();
+      attemptPlay();
+    };
+
+    stream.onaddtrack = handleTrackAdded;
+    stream.onremovetrack = checkTracks;
+
+    return () => {
+      clearInterval(interval);
+      stream.onaddtrack = null;
+      stream.onremovetrack = null;
+      video.onloadedmetadata = null;
+      video.onloadeddata = null;
+      video.onplay = null;
+      video.onpause = null;
+    };
   }, [stream, username]);
 
   return (
@@ -860,10 +905,13 @@ const RemoteTile = ({ userId, username, stream }) => {
         playsInline
         muted={false}
         key={stream?.id || 'no-stream'}
-        style={{ display: hasVideo ? 'block' : 'none' }}
         className='w-full h-full object-cover scale-x-[-1]'
+        style={{ 
+          display: stream && hasVideo ? 'block' : 'none',
+          backgroundColor: '#000'
+        }}
       />
-      {!hasVideo && (
+      {(!stream || !hasVideo) && (
         <div className='absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-tr from-dark-800 to-dark-900'>
           <div className='w-20 h-20 bg-primary-600/20 rounded-full flex items-center justify-center border-2 border-primary-500/30 mb-3'>
             <span className='text-2xl font-bold text-primary-400'>
@@ -873,6 +921,12 @@ const RemoteTile = ({ userId, username, stream }) => {
           <span className='text-gray-400 font-medium'>
             {username || `Participant ${userId}`}
           </span>
+          {stream && !hasVideo && (
+            <span className='text-xs text-gray-500 mt-2'>Camera off</span>
+          )}
+          {!stream && (
+            <span className='text-xs text-gray-500 mt-2'>Connecting...</span>
+          )}
         </div>
       )}
       <div className='absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-semibold border border-white/10'>
