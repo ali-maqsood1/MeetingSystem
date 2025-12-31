@@ -261,25 +261,34 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       };
     }
 
-    // Add local tracks to peer connection if not already present
-    const stream = screenStreamRef.current || localStreamRef.current;
-    if (stream) {
-      const existingSenders = pc.getSenders();
-      stream.getTracks().forEach((track) => {
-        // Check if this exact track is already added
-        const trackAlreadyAdded = existingSenders.some(
-          (sender) => sender.track && sender.track.id === track.id
-        );
-        if (!trackAlreadyAdded) {
-          console.log(`➕ Adding ${track.kind} track to peer ${remoteUserId}`);
-          pc.addTrack(track, stream);
-        } else {
-          console.log(
-            `⏭️ Track ${track.id} already added to peer ${remoteUserId}`
-          );
+    // Safe track synchronization
+    const syncTracks = async () => {
+      const stream = screenStreamRef.current || localStreamRef.current;
+      if (!stream) return;
+
+      const senders = pc.getSenders();
+      for (const track of stream.getTracks()) {
+        const existingSender = senders.find(s => s.track && s.track.kind === track.kind);
+
+        try {
+          if (existingSender) {
+            if (existingSender.track !== track) {
+              console.log(`🔄 Replacing ${track.kind} track for ${remoteUserId}`);
+              await existingSender.replaceTrack(track);
+            } else {
+              console.log(`⏭️ ${track.kind} track already present for ${remoteUserId}`);
+            }
+          } else {
+            console.log(`➕ Adding ${track.kind} track for ${remoteUserId}`);
+            pc.addTrack(track, stream);
+          }
+        } catch (err) {
+          console.error(`❌ Error syncing ${track.kind} track for ${remoteUserId}:`, err);
         }
-      });
-    }
+      }
+    };
+
+    await syncTracks();
 
     // If we're the initiator, create and send offer
     if (isInitiator) {
@@ -441,20 +450,33 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         localStreamRef.current = stream;
         setCameraEnabled(true);
 
-        // Add camera tracks to all existing peer connections
-        peerConnectionsRef.current.forEach(async (pc, remoteUserId) => {
-          stream.getTracks().forEach((track) => {
-            pc.addTrack(track, stream);
-          });
+        // Update all peer connections safely
+        for (const [remoteUserId, pc] of peerConnectionsRef.current.entries()) {
+          const senders = pc.getSenders();
 
-          // Renegotiate
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          socketRef.current.emit('offer', {
-            toUserId: remoteUserId,
-            offer: pc.localDescription,
-          });
-        });
+          for (const track of stream.getTracks()) {
+            const sender = senders.find(s => s.track && s.track.kind === track.kind);
+            if (sender) {
+              console.log(`🔄 Replacing ${track.kind} track for ${remoteUserId}`);
+              await sender.replaceTrack(track);
+            } else {
+              console.log(`➕ Adding ${track.kind} track for ${remoteUserId}`);
+              pc.addTrack(track, stream);
+            }
+          }
+
+          // Renegotiate properly
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socketRef.current.emit('offer', {
+              toUserId: remoteUserId,
+              offer: pc.localDescription,
+            });
+          } catch (err) {
+            console.warn(`⚠️ Negotiation failed for ${remoteUserId} during camera toggle:`, err);
+          }
+        }
       } catch (error) {
         console.error('❌ Failed to access camera:', error);
         alert('Failed to access camera: ' + error.message);
@@ -532,28 +554,34 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           toggleScreen();
         };
 
-        // Replace video tracks in all peer connections
-        peerConnectionsRef.current.forEach(async (pc, remoteUserId) => {
-          // Remove old video tracks
+        // Update all peer connections safely
+        for (const [remoteUserId, pc] of peerConnectionsRef.current.entries()) {
           const senders = pc.getSenders();
-          const videoSender = senders.find(
-            (sender) => sender.track && sender.track.kind === 'video'
-          );
+          const videoTrack = stream.getVideoTracks()[0];
 
+          const videoSender = senders.find(s => s.track && s.track.kind === 'video');
           if (videoSender) {
-            await videoSender.replaceTrack(stream.getVideoTracks()[0]);
+            console.log(`🔄 Replacing video track with screen for ${remoteUserId}`);
+            await videoSender.replaceTrack(videoTrack);
           } else {
-            pc.addTrack(stream.getVideoTracks()[0], stream);
+            console.log(`➕ Adding screen video track for ${remoteUserId}`);
+            pc.addTrack(videoTrack, stream);
           }
 
-          // Renegotiate
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          socketRef.current.emit('offer', {
-            toUserId: remoteUserId,
-            offer: pc.localDescription,
-          });
-        });
+          // Renegotiate properly
+          try {
+            if (pc.signalingState === 'stable') {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              socketRef.current.emit('offer', {
+                toUserId: remoteUserId,
+                offer: pc.localDescription,
+              });
+            }
+          } catch (err) {
+            console.warn(`⚠️ Negotiation failed for ${remoteUserId} during screen share:`, err);
+          }
+        }
       } catch (error) {
         console.error('❌ Failed to share screen:', error);
         alert('Failed to share screen: ' + error.message);
