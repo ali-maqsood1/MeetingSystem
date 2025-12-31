@@ -466,15 +466,17 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           }
 
           // Renegotiate properly
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socketRef.current.emit('offer', {
-              toUserId: remoteUserId,
-              offer: pc.localDescription,
-            });
-          } catch (err) {
-            console.warn(`⚠️ Negotiation failed for ${remoteUserId} during camera toggle:`, err);
+          if (pc.signalingState === 'stable') {
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              socketRef.current.emit('offer', {
+                toUserId: remoteUserId,
+                offer: pc.localDescription,
+              });
+            } catch (err) {
+              console.warn(`⚠️ Negotiation failed for ${remoteUserId} during camera toggle:`, err);
+            }
           }
         }
       } catch (error) {
@@ -509,30 +511,37 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       }
       setScreenEnabled(false);
 
-      // Switch back to camera or remove tracks
-      peerConnectionsRef.current.forEach(async (pc, remoteUserId) => {
-        // Remove screen tracks
-        pc.getSenders().forEach((sender) => {
-          if (sender.track && sender.track.kind === 'video') {
-            pc.removeTrack(sender);
-          }
-        });
+      // Switch back to camera or remove tracks safely
+      for (const [remoteUserId, pc] of peerConnectionsRef.current.entries()) {
+        const senders = pc.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
 
-        // Add camera tracks if camera is enabled
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((track) => {
-            pc.addTrack(track, localStreamRef.current);
-          });
+        try {
+          // Switch video back to camera or stop it
+          if (videoSender) {
+            if (localStreamRef.current) {
+              await videoSender.replaceTrack(localStreamRef.current.getVideoTracks()[0]);
+            } else {
+              pc.removeTrack(videoSender);
+            }
+          }
+
+          // Switch audio back to camera or stop it
+          if (audioSender && localStreamRef.current) {
+            await audioSender.replaceTrack(localStreamRef.current.getAudioTracks()[0]);
+          }
+        } catch (err) {
+          console.warn(`❌ Error reverting tracks for ${remoteUserId}:`, err);
         }
 
-        // Renegotiate
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socketRef.current.emit('offer', {
-          toUserId: remoteUserId,
-          offer: pc.localDescription,
-        });
-      });
+        // Renegotiate only if stable
+        if (pc.signalingState === 'stable') {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketRef.current.emit('offer', { toUserId: remoteUserId, offer: pc.localDescription });
+        }
+      }
     } else {
       // Start screen share
       try {
@@ -569,17 +578,17 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           }
 
           // Renegotiate properly
-          try {
-            if (pc.signalingState === 'stable') {
+          if (pc.signalingState === 'stable') {
+            try {
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
               socketRef.current.emit('offer', {
                 toUserId: remoteUserId,
                 offer: pc.localDescription,
               });
+            } catch (err) {
+              console.warn(`⚠️ Negotiation failed for ${remoteUserId} during screen share:`, err);
             }
-          } catch (err) {
-            console.warn(`⚠️ Negotiation failed for ${remoteUserId} during screen share:`, err);
           }
         }
       } catch (error) {
