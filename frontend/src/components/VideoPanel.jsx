@@ -793,12 +793,37 @@ const RemoteTile = ({ userId, username, stream }) => {
         'Tracks:',
         stream.getTracks().map((t) => t.kind)
       );
-      videoRef.current.srcObject = stream;
 
-      // Force play
-      videoRef.current
-        .play()
-        .catch((e) => console.error('Remote video play error:', e));
+      const video = videoRef.current;
+      video.srcObject = stream;
+
+      // Multiple play attempts to ensure it works
+      const attemptPlay = () => {
+        video
+          .play()
+          .then(() =>
+            console.log(`✅ [RemoteTile] Playing video for ${username}`)
+          )
+          .catch((e) => {
+            console.error(`❌ [RemoteTile] Play error for ${username}:`, e);
+            // Retry after a delay
+            setTimeout(attemptPlay, 500);
+          });
+      };
+
+      // Try playing immediately
+      attemptPlay();
+
+      // Also try when video is loaded
+      video.onloadedmetadata = () => {
+        console.log(`📽️ [RemoteTile] Metadata loaded for ${username}`);
+        attemptPlay();
+      };
+
+      video.onloadeddata = () => {
+        console.log(`📼 [RemoteTile] Data loaded for ${username}`);
+        attemptPlay();
+      };
 
       const checkTracks = () => {
         const videoTracks = stream.getVideoTracks();
@@ -811,10 +836,11 @@ const RemoteTile = ({ userId, username, stream }) => {
         setHasVideo(hasVideoTrack);
       };
 
-      // Check immediately and after a small delay
+      // Check immediately and after delays
       checkTracks();
       setTimeout(checkTracks, 100);
       setTimeout(checkTracks, 500);
+      setTimeout(checkTracks, 1000);
 
       stream.onaddtrack = checkTracks;
       stream.onremovetrack = checkTracks;
@@ -836,9 +862,8 @@ const RemoteTile = ({ userId, username, stream }) => {
         playsInline
         muted={false}
         key={stream?.id || 'no-stream'}
-        className={`w-full h-full object-cover scale-x-[-1] ${
-          hasVideo ? 'opacity-100' : 'opacity-0'
-        }`}
+        style={{ display: hasVideo ? 'block' : 'none' }}
+        className='w-full h-full object-cover scale-x-[-1]'
       />
       {!hasVideo && (
         <div className='absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-tr from-dark-800 to-dark-900'>
