@@ -146,7 +146,7 @@ cd /Users/alimaqsood/Desktop/MeetingSystem
 # Upload entire project
 scp -i ~/Downloads/meeting-system-key.pem -r \
   /Users/alimaqsood/Desktop/MeetingSystem \
-  ubuntu@YOUR_EC2_IP:~/
+  ubuntu@51.20.77.103:~/
 ```
 
 **Then on EC2:**
@@ -171,7 +171,7 @@ cmake ..
 make -j4
 
 # Verify the executable was created
-ls -lh meeting_server
+.
 ```
 
 You should see: `-rwxr-xr-x meeting_server` (executable)
@@ -198,12 +198,14 @@ You should see:
 HTTP Server initializing on 0.0.0.0:8080
 Server is running!
 ```
+ID
+51676e79-406c-4695-8381-517e2d2cd92c
 
 **Test it:**
 
 ```bash
 # In another terminal (or from your laptop)
-curl http://YOUR_EC2_IP:8080/health
+curl http://51.20.77.103:8080/health
 ```
 
 Expected: `{"status":"ok"}`
@@ -307,7 +309,7 @@ Update your frontend to use the EC2 IP address:
 **Create `.env.production` in frontend directory:**
 
 ```bash
-VITE_API_URL=http://YOUR_EC2_IP:8080/api/v1
+VITE_API_URL=http://51.20.77.103:8080/api/v1
 ```
 
 **Or update `frontend/src/utils/api.js` to use EC2 IP directly.**

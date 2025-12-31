@@ -12,7 +12,7 @@ const getApiUrl = () => {
     ? 'localhost'
     : window.location.hostname;
 
-  return `http://${hostname}:8080/api/v1`;
+  return `http://51.20.77.103:8080/api/v1`;
 };
 
 const API_URL = getApiUrl();

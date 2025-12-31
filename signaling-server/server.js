@@ -4,6 +4,11 @@ const { Server } = require('socket.io');
 
 const app = express();
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'WebRTC Signaling Server' });
+});
+
 // In production (Render/Railway), use HTTP - they provide HTTPS via reverse proxy
 // In development, we used HTTPS directly
 const httpServer = createServer(app);

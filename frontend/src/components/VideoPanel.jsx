@@ -230,11 +230,19 @@ const VideoPanel = ({ meetingId, userId, username }) => {
     // Add local tracks to peer connection if not already present
     const stream = screenStreamRef.current || localStreamRef.current;
     if (stream) {
+      const existingSenders = pc.getSenders();
       stream.getTracks().forEach((track) => {
-        const senders = pc.getSenders();
-        const alreadyAdded = senders.some((s) => s.track === track);
-        if (!alreadyAdded) {
+        // Check if this exact track is already added
+        const trackAlreadyAdded = existingSenders.some(
+          (sender) => sender.track && sender.track.id === track.id
+        );
+        if (!trackAlreadyAdded) {
+          console.log(`➕ Adding ${track.kind} track to peer ${remoteUserId}`);
           pc.addTrack(track, stream);
+        } else {
+          console.log(
+            `⏭️ Track ${track.id} already added to peer ${remoteUserId}`
+          );
         }
       });
     }
