@@ -49,26 +49,32 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' },
 
-      // Free TURN servers for relay when direct connection fails
+      // Twilio STUN servers
+      { urls: 'stun:global.stun.twilio.com:3478' },
+
+      // Multiple free TURN server options for better reliability
       {
-        urls: 'turn:openrelay.metered.ca:80',
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp',
+        ],
         username: 'openrelayproject',
         credential: 'openrelayproject',
       },
       {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
+        urls: ['turn:relay1.expressturn.com:3478'],
+        username: 'efTHWAW22I8K1UAAEV',
+        credential: 'ghi5FBdxrURyRxo0',
       },
       {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
+        urls: 'turn:numb.viagenie.ca',
+        username: 'webrtc@live.com',
+        credential: 'muazkh',
       },
     ],
+    iceCandidatePoolSize: 10,
   };
 
   // Initialize Socket.IO connection
