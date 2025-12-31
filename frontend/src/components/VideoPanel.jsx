@@ -117,16 +117,18 @@ const VideoPanel = ({ meetingId, userId, username }) => {
     });
 
     newSocket.on('answer', async ({ fromUserId, answer }) => {
+      if (fromUserId === userId) return;
       console.log(`📨 Received answer from ${fromUserId}`);
       const pc = peerConnectionsRef.current.get(fromUserId);
       if (pc) {
         try {
+          if (pc.signalingState !== 'have-local-offer') {
+            console.warn(`⚠️ Ignoring answer from ${fromUserId} as pc is in state: ${pc.signalingState}`);
+            return;
+          }
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
         } catch (err) {
-          console.error(
-            `❌ Error setting remote answer for ${fromUserId}:`,
-            err
-          );
+          console.error(`❌ Error setting remote answer for ${fromUserId}:`, err);
         }
       }
     });
@@ -197,10 +199,30 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       console.log(`🏗️ Creating new PeerConnection for ${remoteUserId}`);
       pc = new RTCPeerConnection(ICE_SERVERS);
       peerConnectionsRef.current.set(remoteUserId, pc);
-      negotiationStateRef.current.set(remoteUserId, {
+
+      const state = {
         makingOffer: false,
         ignoreOffer: false,
-      });
+        isSettingRemoteAnswerPending: false
+      };
+      negotiationStateRef.current.set(remoteUserId, state);
+
+      // Perfect Negotiation: Handle negotiationneeded
+      pc.onnegotiationneeded = async () => {
+        try {
+          console.log(`🔄 Negotiation needed with ${remoteUserId}`);
+          state.makingOffer = true;
+          await pc.setLocalDescription();
+          socketRef.current.emit('offer', {
+            toUserId: remoteUserId,
+            offer: pc.localDescription,
+          });
+        } catch (err) {
+          console.error(`❌ Negotiation error for ${remoteUserId}:`, err);
+        } finally {
+          state.makingOffer = false;
+        }
+      };
 
       // Handle incoming remote tracks
       pc.ontrack = (event) => {
@@ -290,63 +312,20 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         try {
           if (existingSender) {
             if (existingSender.track !== track) {
-              console.log(
-                `🔄 Replacing ${track.kind} track for ${remoteUserId}`
-              );
+              console.log(`🔄 Replacing ${track.kind} track for ${remoteUserId}`);
               await existingSender.replaceTrack(track);
-            } else {
-              console.log(
-                `⏭️ ${track.kind} track already present for ${remoteUserId}`
-              );
             }
           } else {
             console.log(`➕ Adding ${track.kind} track for ${remoteUserId}`);
             pc.addTrack(track, stream);
           }
         } catch (err) {
-          console.error(
-            `❌ Error syncing ${track.kind} track for ${remoteUserId}:`,
-            err
-          );
+          console.error(`❌ Error syncing ${track.kind} track for ${remoteUserId}:`, err);
         }
       }
     };
 
     await syncTracks();
-
-    console.log(`🔍 [DEBUG] Tracks being sent to ${remoteUserId}:`, {
-      localStream: localStreamRef.current
-        ?.getTracks()
-        .map((t) => `${t.kind}:${t.enabled}:${t.readyState}`),
-      screenStream: screenStreamRef.current
-        ?.getTracks()
-        .map((t) => `${t.kind}:${t.enabled}:${t.readyState}`),
-      senders: pc
-        .getSenders()
-        .map(
-          (s) => `${s.track?.kind}:${s.track?.enabled}:${s.track?.readyState}`
-        ),
-    });
-
-    // If we're the initiator, create and send offer
-    if (isInitiator) {
-      try {
-        const state = negotiationStateRef.current.get(remoteUserId);
-        state.makingOffer = true;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socketRef.current.emit('offer', {
-          toUserId: remoteUserId,
-          offer: pc.localDescription,
-        });
-      } catch (err) {
-        console.error(`❌ Error creating offer for ${remoteUserId}:`, err);
-      } finally {
-        const state = negotiationStateRef.current.get(remoteUserId);
-        if (state) state.makingOffer = false;
-      }
-    }
-
     return pc;
   };
 
@@ -356,8 +335,7 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       const state = negotiationStateRef.current.get(remoteUserId);
       const polite = isPolite(remoteUserId);
 
-      const offerCollision =
-        state.makingOffer || pc.signalingState !== 'stable';
+      const offerCollision = state.makingOffer || pc.signalingState !== 'stable';
       state.ignoreOffer = !polite && offerCollision;
 
       if (state.ignoreOffer) {
@@ -366,8 +344,7 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       }
 
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
+      await pc.setLocalDescription();
       socketRef.current.emit('answer', {
         toUserId: remoteUserId,
         answer: pc.localDescription,
@@ -497,26 +474,12 @@ const VideoPanel = ({ meetingId, userId, username }) => {
               (s) => s.track && s.track.kind === track.kind
             );
             if (sender) {
-              console.log(
-                `🔄 Replacing ${track.kind} track for ${remoteUserId}`
-              );
-              await sender.replaceTrack(track);
+              console.log(`🔄 Replacing ${track.kind} track for ${remoteUserId}`);
+              await sender.replaceTrack(track).catch(e => console.warn(`ReplaceTrack failed for ${remoteUserId}:`, e));
             } else {
               console.log(`➕ Adding ${track.kind} track for ${remoteUserId}`);
               pc.addTrack(track, stream);
             }
-          }
-
-          // Renegotiate - remove the signalingState check as we're the initiator
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socketRef.current.emit('offer', {
-              toUserId: remoteUserId,
-              offer: pc.localDescription,
-            });
-          } catch (err) {
-            console.warn(`⚠️ Offer failed for ${remoteUserId}:`, err);
           }
         }
       } catch (error) {
@@ -625,25 +588,11 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             (s) => s.track && s.track.kind === 'video'
           );
           if (videoSender) {
-            console.log(
-              `🔄 Replacing video track with screen for ${remoteUserId}`
-            );
-            await videoSender.replaceTrack(videoTrack);
+            console.log(`🔄 Replacing video track with screen for ${remoteUserId}`);
+            await videoSender.replaceTrack(videoTrack).catch(e => console.warn(`ReplacedTrack(screen) failed for ${remoteUserId}:`, e));
           } else {
             console.log(`➕ Adding screen video track for ${remoteUserId}`);
             pc.addTrack(videoTrack, stream);
-          }
-
-          // Renegotiate
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socketRef.current.emit('offer', {
-              toUserId: remoteUserId,
-              offer: pc.localDescription,
-            });
-          } catch (err) {
-            console.warn(`⚠️ Screen offer failed for ${remoteUserId}:`, err);
           }
         }
       } catch (error) {
@@ -680,12 +629,12 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         ) : (
           <div
             className={`grid gap-4 h-full content-center ${participants.size + 1 === 1
-                ? 'grid-cols-1'
-                : participants.size + 1 === 2
-                  ? 'grid-cols-1 md:grid-cols-2'
-                  : participants.size + 1 <= 4
-                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
-                    : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              ? 'grid-cols-1'
+              : participants.size + 1 === 2
+                ? 'grid-cols-1 md:grid-cols-2'
+                : participants.size + 1 <= 4
+                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
               }`}
           >
             {/* Local Video Tile */}
@@ -751,8 +700,8 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             <button
               onClick={toggleMic}
               className={`p-4 rounded-full transition-all duration-300 border ${micEnabled
-                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
                 }`}
             >
               {micEnabled ? (
@@ -764,8 +713,8 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             <button
               onClick={toggleCamera}
               className={`p-4 rounded-full transition-all duration-300 border ${cameraEnabled
-                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
                 }`}
             >
               {cameraEnabled ? (
@@ -777,8 +726,8 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             <button
               onClick={toggleScreen}
               className={`p-4 rounded-full transition-all duration-300 border ${screenEnabled
-                  ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
-                  : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
+                : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
                 }`}
             >
               <Monitor className='w-6 h-6' />
