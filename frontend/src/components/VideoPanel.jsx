@@ -129,12 +129,21 @@ const VideoPanel = ({ meetingId, userId, username }) => {
     newSocket.on('iceCandidate', async ({ fromUserId, candidate }) => {
       const pc = peerConnectionsRef.current.get(fromUserId);
       if (pc && candidate) {
+        const candStr = candidate.candidate || '';
+        let type = 'unknown';
+        if (candStr.includes('typ relay')) type = 'RELAY';
+        else if (candStr.includes('typ srflx')) type = 'STUN';
+        else if (candStr.includes('typ host')) type = 'LOCAL';
+
         console.log(
-          `🧊 Adding ICE candidate from ${fromUserId}:`,
-          candidate.type,
-          candidate.candidate?.substring(0, 50)
+          `🧊 [ICE] From ${fromUserId} (${type}):`,
+          candStr.substring(0, 70) + '...'
         );
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error(`❌ Error adding ICE candidate from ${fromUserId}:`, err);
+        }
       }
     });
 
@@ -573,12 +582,12 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         ) : (
           <div
             className={`grid gap-4 h-full content-center ${participants.size + 1 === 1
-                ? 'grid-cols-1'
-                : participants.size + 1 === 2
-                  ? 'grid-cols-1 md:grid-cols-2'
-                  : participants.size + 1 <= 4
-                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
-                    : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              ? 'grid-cols-1'
+              : participants.size + 1 === 2
+                ? 'grid-cols-1 md:grid-cols-2'
+                : participants.size + 1 <= 4
+                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
               }`}
           >
             {/* Local Video Tile */}
@@ -644,8 +653,8 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             <button
               onClick={toggleMic}
               className={`p-4 rounded-full transition-all duration-300 border ${micEnabled
-                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
                 }`}
             >
               {micEnabled ? (
@@ -657,8 +666,8 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             <button
               onClick={toggleCamera}
               className={`p-4 rounded-full transition-all duration-300 border ${cameraEnabled
-                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
                 }`}
             >
               {cameraEnabled ? (
@@ -670,8 +679,8 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             <button
               onClick={toggleScreen}
               className={`p-4 rounded-full transition-all duration-300 border ${screenEnabled
-                  ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
-                  : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
+                : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
                 }`}
             >
               <Monitor className='w-6 h-6' />
@@ -712,6 +721,7 @@ const RemoteTile = ({ userId, username, stream }) => {
           ref={videoRef}
           autoPlay
           playsInline
+          key={stream.id} // Re-mount video element if stream changes
           className='w-full h-full object-cover'
         />
       ) : (
