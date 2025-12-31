@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Connection Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            background: #00ff00;
+            color: #000;
+            border: none;
+            cursor: pointer;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background: #000;
+            border: 1px solid #00ff00;
+            height: 400px;
+            overflow-y: scroll;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .info { color: #00ffff; }
+    </style>
+</head>
+<body>
+    <h1>WebRTC TURN Server Test</h1>
+    <button onclick="testConnection()">Test TURN Connectivity</button>
+    <button onclick="clearLog()">Clear Log</button>
+    <div id="log"></div>
+
+    <script>
+        const log = (msg, type = 'info') => {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById('log').appendChild(div);
+            document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+        };
+
+        const clearLog = () => {
+            document.getElementById('log').innerHTML = '';
+        };
+
+        async function testConnection() {
+            log('🧪 Testing TURN server connectivity...', 'info');
+            
+            const config = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject',
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject',
+                    },
+                ],
+            };
+
+            const pc = new RTCPeerConnection(config);
+            
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    const candidate = event.candidate.candidate;
+                    if (candidate.includes('typ relay')) {
+                        log('✅ RELAY candidate (TURN working!): ' + candidate.substring(0, 80), 'success');
+                    } else if (candidate.includes('typ srflx')) {
+                        log('✅ SRFLX candidate (STUN working): ' + candidate.substring(0, 80), 'success');
+                    } else if (candidate.includes('typ host')) {
+                        log('ℹ️  HOST candidate (local): ' + candidate.substring(0, 80), 'info');
+                    } else {
+                        log('ℹ️  Candidate: ' + candidate.substring(0, 80), 'info');
+                    }
+                } else {
+                    log('✅ ICE gathering complete', 'success');
+                }
+            };
+
+            pc.onicecandidateerror = (event) => {
+                log('❌ ICE candidate error: ' + event.errorText, 'error');
+            };
+
+            pc.oniceconnectionstatechange = () => {
+                log(`🔗 ICE connection state: ${pc.iceConnectionState}`, 'info');
+            };
+
+            // Create a data channel to trigger ICE gathering
+            const dc = pc.createDataChannel('test');
+            
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                log('📤 Offer created, gathering ICE candidates...', 'info');
+            } catch (err) {
+                log('❌ Error: ' + err.message, 'error');
+            }
+        }
+
+        // Auto-run test on load
+        window.addEventListener('load', () => {
+            log('🚀 WebRTC TURN Test Ready', 'success');
+            log('ℹ️  Click "Test TURN Connectivity" to check if TURN servers work', 'info');
+        });
+    </script>
+</body>
+</html>

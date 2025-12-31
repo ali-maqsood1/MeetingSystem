@@ -139,6 +139,11 @@ const VideoPanel = ({ meetingId, userId, username }) => {
     newSocket.on('iceCandidate', async ({ fromUserId, candidate }) => {
       const pc = peerConnectionsRef.current.get(fromUserId);
       if (pc && candidate) {
+        console.log(
+          `🧊 Adding ICE candidate from ${fromUserId}:`,
+          candidate.type,
+          candidate.candidate?.substring(0, 50)
+        );
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       }
     });
@@ -205,11 +210,32 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
-        if (event.candidate && socketRef.current) {
-          socketRef.current.emit('iceCandidate', {
-            toUserId: remoteUserId,
-            candidate: event.candidate,
-          });
+        if (event.candidate) {
+          console.log(
+            `🧊 ICE candidate for ${remoteUserId}:`,
+            event.candidate.type,
+            event.candidate.candidate?.substring(0, 50)
+          );
+          if (socketRef.current) {
+            socketRef.current.emit('iceCandidate', {
+              toUserId: remoteUserId,
+              candidate: event.candidate,
+            });
+          }
+        } else {
+          console.log(`✅ ICE gathering complete for ${remoteUserId}`);
+        }
+      };
+
+      // Handle ICE connection state changes
+      pc.oniceconnectionstatechange = () => {
+        console.log(
+          `❄️ ICE connection state with ${remoteUserId}: ${pc.iceConnectionState}`
+        );
+        if (pc.iceConnectionState === 'connected') {
+          console.log(`✅ P2P connection established with ${remoteUserId}`);
+        } else if (pc.iceConnectionState === 'failed') {
+          console.error(`❌ ICE connection failed with ${remoteUserId}`);
         }
       };
 
@@ -222,6 +248,9 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           pc.connectionState === 'disconnected' ||
           pc.connectionState === 'failed'
         ) {
+          console.error(
+            `❌ Connection failed/disconnected with ${remoteUserId}`
+          );
           closePeerConnection(remoteUserId);
         }
       };
