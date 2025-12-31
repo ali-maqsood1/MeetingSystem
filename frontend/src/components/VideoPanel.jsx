@@ -315,6 +315,20 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
     await syncTracks();
 
+    console.log(`🔍 [DEBUG] Tracks being sent to ${remoteUserId}:`, {
+      localStream: localStreamRef.current
+        ?.getTracks()
+        .map((t) => `${t.kind}:${t.enabled}:${t.readyState}`),
+      screenStream: screenStreamRef.current
+        ?.getTracks()
+        .map((t) => `${t.kind}:${t.enabled}:${t.readyState}`),
+      senders: pc
+        .getSenders()
+        .map(
+          (s) => `${s.track?.kind}:${s.track?.enabled}:${s.track?.readyState}`
+        ),
+    });
+
     // If we're the initiator, create and send offer
     if (isInitiator) {
       try {
@@ -833,7 +847,10 @@ const RemoteTile = ({ userId, username, stream }) => {
 
     const checkTracks = () => {
       const videoTracks = stream.getVideoTracks();
-      const hasVideoTrack = videoTracks.length > 0 && videoTracks[0].enabled && videoTracks[0].readyState === 'live';
+      const hasVideoTrack =
+        videoTracks.length > 0 &&
+        videoTracks[0].enabled &&
+        videoTracks[0].readyState === 'live';
       console.log(
         `📺 [RemoteTile] ${username} video tracks:`,
         videoTracks.length,
@@ -878,7 +895,10 @@ const RemoteTile = ({ userId, username, stream }) => {
 
     // Listen for track changes
     const handleTrackAdded = (e) => {
-      console.log(`➕ [RemoteTile] Track added to ${username}'s stream:`, e.track.kind);
+      console.log(
+        `➕ [RemoteTile] Track added to ${username}'s stream:`,
+        e.track.kind
+      );
       checkTracks();
       attemptPlay();
     };
@@ -906,9 +926,9 @@ const RemoteTile = ({ userId, username, stream }) => {
         muted={false}
         key={stream?.id || 'no-stream'}
         className='w-full h-full object-cover scale-x-[-1]'
-        style={{ 
+        style={{
           display: stream && hasVideo ? 'block' : 'none',
-          backgroundColor: '#000'
+          backgroundColor: '#000',
         }}
       />
       {(!stream || !hasVideo) && (
