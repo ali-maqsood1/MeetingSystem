@@ -210,8 +210,20 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         if (stream) {
           setRemoteStreams((prev) => {
             const newMap = new Map(prev);
-            newMap.set(remoteUserId, stream);
-            // Force a new map object to ensure state update
+            const existingStream = newMap.get(remoteUserId);
+
+            if (existingStream && existingStream.id === stream.id) {
+              // Same stream, just a new track was added
+              console.log(
+                `✅ Track added to existing stream for ${remoteUserId}`
+              );
+              newMap.set(remoteUserId, stream); // Update to trigger re-render
+            } else {
+              // New stream
+              console.log(`✅ New stream for ${remoteUserId}`);
+              newMap.set(remoteUserId, stream);
+            }
+
             return new Map(newMap);
           });
         }
@@ -791,13 +803,12 @@ const RemoteTile = ({ userId, username, stream }) => {
         `🎬 [RemoteTile] Attaching stream for ${username}:`,
         stream.id,
         'Tracks:',
-        stream.getTracks().map((t) => t.kind)
+        stream.getTracks().map((t) => `${t.kind}:${t.enabled}`)
       );
 
       const video = videoRef.current;
       video.srcObject = stream;
 
-      // Multiple play attempts to ensure it works
       const attemptPlay = () => {
         video
           .play()
@@ -806,51 +817,38 @@ const RemoteTile = ({ userId, username, stream }) => {
           )
           .catch((e) => {
             console.error(`❌ [RemoteTile] Play error for ${username}:`, e);
-            // Retry after a delay
             setTimeout(attemptPlay, 500);
           });
       };
 
-      // Try playing immediately
       attemptPlay();
-
-      // Also try when video is loaded
-      video.onloadedmetadata = () => {
-        console.log(`📽️ [RemoteTile] Metadata loaded for ${username}`);
-        attemptPlay();
-      };
-
-      video.onloadeddata = () => {
-        console.log(`📼 [RemoteTile] Data loaded for ${username}`);
-        attemptPlay();
-      };
 
       const checkTracks = () => {
         const videoTracks = stream.getVideoTracks();
         const hasVideoTrack = videoTracks.length > 0 && videoTracks[0].enabled;
         console.log(
-          `📺 [RemoteTile] ${username} has video:`,
-          hasVideoTrack,
-          videoTracks
+          `📺 [RemoteTile] ${username} video tracks:`,
+          videoTracks.length,
+          'has video:',
+          hasVideoTrack
         );
         setHasVideo(hasVideoTrack);
       };
 
-      // Check immediately and after delays
       checkTracks();
-      setTimeout(checkTracks, 100);
-      setTimeout(checkTracks, 500);
-      setTimeout(checkTracks, 1000);
+      const interval = setInterval(checkTracks, 1000); // Check periodically
 
-      stream.onaddtrack = checkTracks;
+      stream.onaddtrack = () => {
+        console.log(`➕ Track added to ${username}'s stream`);
+        checkTracks();
+      };
       stream.onremovetrack = checkTracks;
 
       return () => {
+        clearInterval(interval);
         stream.onaddtrack = null;
         stream.onremovetrack = null;
       };
-    } else {
-      console.log(`⚠️ [RemoteTile] No stream for ${username}`);
     }
   }, [stream, username]);
 
