@@ -736,37 +736,53 @@ const RemoteTile = ({ userId, username, stream }) => {
   }, [stream, username]);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      console.log(`📺 Attaching stream to video for ${username}`);
-      videoRef.current.srcObject = stream;
+    const video = videoRef.current;
+    if (video && stream) {
+      // Only set srcObject if it's actually different to avoid play() interruptions
+      if (video.srcObject !== stream) {
+        console.log(`📺 Attaching new stream to video for ${username}`);
+        video.srcObject = stream;
+      }
 
-      // Ensure it starts playing
-      videoRef.current.play().catch(e => {
-        console.warn(`🔇 Playback waiting for interaction/blocked for ${username}:`, e);
-      });
+      // Attempt to play whenever stream or trackCount changes
+      const playVideo = () => {
+        video.play().catch(e => {
+          if (e.name === 'AbortError') {
+            // Ignore AbortError as it's just a playback interruption
+          } else {
+            console.warn(`🔇 Playback blocked for ${username}:`, e);
+          }
+        });
+      };
+
+      playVideo();
     }
   }, [stream, trackCount, username]);
 
   return (
     <div className='relative aspect-video bg-dark-800 rounded-3xl overflow-hidden border border-white/5 shadow-2xl group transition-transform duration-300 hover:scale-[1.01]'>
-      {stream && stream.getVideoTracks().length > 0 ? (
+      {/* Always render video if stream exists to prevent unmounting/AbortError */}
+      {stream && (
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          muted={false} // Ensure remote audio is audible
-          key={stream.id + trackCount} // Force remount if track count changes
-          className='w-full h-full object-cover'
+          muted={false}
+          className={`w-full h-full object-cover transition-opacity duration-500 ${trackCount > 0 && stream.getVideoTracks().length > 0 ? 'opacity-100' : 'opacity-0'
+            }`}
         />
-      ) : (
-        <div className='w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-dark-800 to-dark-900'>
+      )}
+
+      {/* Overlay for connecting/audio-only state */}
+      {(!stream || stream.getVideoTracks().length === 0) && (
+        <div className='absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-tr from-dark-800 to-dark-900'>
           <div className='w-20 h-20 bg-indigo-600/20 rounded-full flex items-center justify-center border-2 border-indigo-500/30 mb-3'>
             <span className='text-2xl font-bold text-indigo-400'>
               {username?.[0]?.toUpperCase() || <User className='w-10 h-10' />}
             </span>
           </div>
           <span className='text-gray-400 font-medium'>
-            {username ? `${username} (Connecting...)` : `Participant ${userId}`}
+            {!stream ? 'Wait...' : `${username} (Connecting...)`}
           </span>
           {stream && stream.getAudioTracks().length > 0 && (
             <span className='text-xs text-primary-400 mt-2 flex items-center gap-1'>
