@@ -43,35 +43,19 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
   const SIGNALING_SERVER = getSignalingUrl();
 
+  // ICE Server configuration - Use your own TURN server for reliable connectivity
   const ICE_SERVERS = {
     iceServers: [
-      // Google STUN servers for NAT discovery
+      // Google STUN servers (Keep these, they are free and very reliable for basic NAT)
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
 
-      // Twilio STUN servers
-      { urls: 'stun:global.stun.twilio.com:3478' },
-
-      // Multiple free TURN server options for better reliability
+      // Your self-hosted CoTURN server on EC2
+      // This is the CRITICAL part for cross-network calls
       {
-        urls: [
-          'turn:openrelay.metered.ca:80',
-          'turn:openrelay.metered.ca:443',
-          'turn:openrelay.metered.ca:443?transport=tcp',
-        ],
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: ['turn:relay1.expressturn.com:3478'],
-        username: 'efTHWAW22I8K1UAAEV',
-        credential: 'ghi5FBdxrURyRxo0',
-      },
-      {
-        urls: 'turn:numb.viagenie.ca',
-        username: 'webrtc@live.com',
-        credential: 'muazkh',
+        urls: import.meta.env.VITE_TURN_URL || 'turn:51.20.77.103:3478',
+        username: import.meta.env.VITE_TURN_USERNAME || 'meetinguser',
+        credential: import.meta.env.VITE_TURN_CREDENTIAL || 'SecurePassword123!',
       },
     ],
     iceCandidatePoolSize: 10,
@@ -588,15 +572,14 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           </div>
         ) : (
           <div
-            className={`grid gap-4 h-full content-center ${
-              participants.size + 1 === 1
+            className={`grid gap-4 h-full content-center ${participants.size + 1 === 1
                 ? 'grid-cols-1'
                 : participants.size + 1 === 2
-                ? 'grid-cols-1 md:grid-cols-2'
-                : participants.size + 1 <= 4
-                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}
+                  ? 'grid-cols-1 md:grid-cols-2'
+                  : participants.size + 1 <= 4
+                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
+                    : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              }`}
           >
             {/* Local Video Tile */}
             <div className='relative aspect-video bg-dark-800 rounded-3xl overflow-hidden border border-white/5 shadow-2xl group'>
@@ -660,11 +643,10 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           <div className='flex items-center gap-4'>
             <button
               onClick={toggleMic}
-              className={`p-4 rounded-full transition-all duration-300 border ${
-                micEnabled
+              className={`p-4 rounded-full transition-all duration-300 border ${micEnabled
                   ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
                   : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
-              }`}
+                }`}
             >
               {micEnabled ? (
                 <Mic className='w-6 h-6' />
@@ -674,11 +656,10 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             </button>
             <button
               onClick={toggleCamera}
-              className={`p-4 rounded-full transition-all duration-300 border ${
-                cameraEnabled
+              className={`p-4 rounded-full transition-all duration-300 border ${cameraEnabled
                   ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
                   : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
-              }`}
+                }`}
             >
               {cameraEnabled ? (
                 <Video className='w-6 h-6' />
@@ -688,11 +669,10 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             </button>
             <button
               onClick={toggleScreen}
-              className={`p-4 rounded-full transition-all duration-300 border ${
-                screenEnabled
+              className={`p-4 rounded-full transition-all duration-300 border ${screenEnabled
                   ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
                   : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-              }`}
+                }`}
             >
               <Monitor className='w-6 h-6' />
             </button>
