@@ -15,10 +15,13 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
     cors: {
-        origin: true, // Allow all origins in production (configure specific domains if needed)
+        origin: true,
         methods: ["GET", "POST"],
         credentials: true
-    }
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    connectTimeout: 45000
 });
 
 const connectedUsers = new Map(); // socketId -> { username, userId, meetingId }
