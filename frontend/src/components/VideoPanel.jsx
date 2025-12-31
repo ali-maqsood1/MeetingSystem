@@ -196,15 +196,21 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
       // Handle incoming remote tracks
       pc.ontrack = (event) => {
+        const stream = event.streams[0];
+        const kind = event.track.kind;
         console.log(
-          `📹 Received remote track from ${remoteUserId}`,
-          event.streams[0]
+          `📹 [REF] Received ${kind} track from ${remoteUserId}`,
+          stream ? `Stream ID: ${stream.id}` : 'No stream'
         );
-        setRemoteStreams((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(remoteUserId, event.streams[0]);
-          return newMap;
-        });
+
+        if (stream) {
+          setRemoteStreams((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(remoteUserId, stream);
+            // Force a new map object to ensure state update
+            return new Map(newMap);
+          });
+        }
       };
 
       // Handle ICE candidates
@@ -707,21 +713,49 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 // Remote participant tile
 const RemoteTile = ({ userId, username, stream }) => {
   const videoRef = useRef(null);
+  const [trackCount, setTrackCount] = useState(0);
+
+  // Monitor tracks to force re-render when a stream gets new tracks
+  useEffect(() => {
+    if (!stream) return;
+
+    const countTracks = () => {
+      const count = stream.getTracks().length;
+      setTrackCount(count);
+      console.log(`📊 ${username}'s stream has ${count} tracks (${stream.getVideoTracks().length} video)`);
+    };
+
+    countTracks();
+    stream.onaddtrack = countTracks;
+    stream.onremovetrack = countTracks;
+
+    return () => {
+      stream.onaddtrack = null;
+      stream.onremovetrack = null;
+    };
+  }, [stream, username]);
 
   useEffect(() => {
     if (videoRef.current && stream) {
+      console.log(`📺 Attaching stream to video for ${username}`);
       videoRef.current.srcObject = stream;
+
+      // Ensure it starts playing
+      videoRef.current.play().catch(e => {
+        console.warn(`🔇 Playback waiting for interaction/blocked for ${username}:`, e);
+      });
     }
-  }, [stream]);
+  }, [stream, trackCount, username]);
 
   return (
     <div className='relative aspect-video bg-dark-800 rounded-3xl overflow-hidden border border-white/5 shadow-2xl group transition-transform duration-300 hover:scale-[1.01]'>
-      {stream ? (
+      {stream && stream.getVideoTracks().length > 0 ? (
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          key={stream.id} // Re-mount video element if stream changes
+          muted={false} // Ensure remote audio is audible
+          key={stream.id + trackCount} // Force remount if track count changes
           className='w-full h-full object-cover'
         />
       ) : (
@@ -732,8 +766,13 @@ const RemoteTile = ({ userId, username, stream }) => {
             </span>
           </div>
           <span className='text-gray-400 font-medium'>
-            {username || `Participant ${userId}`}
+            {username ? `${username} (Connecting...)` : `Participant ${userId}`}
           </span>
+          {stream && stream.getAudioTracks().length > 0 && (
+            <span className='text-xs text-primary-400 mt-2 flex items-center gap-1'>
+              <Mic className='w-3 h-3' /> Audio Only Received
+            </span>
+          )}
         </div>
       )}
       <div className='absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-semibold border border-white/10'>
