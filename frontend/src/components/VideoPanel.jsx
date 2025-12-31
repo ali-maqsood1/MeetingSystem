@@ -55,7 +55,8 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       {
         urls: import.meta.env.VITE_TURN_URL || 'turn:51.20.77.103:3478',
         username: import.meta.env.VITE_TURN_USERNAME || 'meetinguser',
-        credential: import.meta.env.VITE_TURN_CREDENTIAL || 'SecurePassword123!',
+        credential:
+          import.meta.env.VITE_TURN_CREDENTIAL || 'SecurePassword123!',
       },
     ],
     iceCandidatePoolSize: 10,
@@ -142,7 +143,10 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (err) {
-          console.error(`❌ Error adding ICE candidate from ${fromUserId}:`, err);
+          console.error(
+            `❌ Error adding ICE candidate from ${fromUserId}:`,
+            err
+          );
         }
       }
     });
@@ -268,22 +272,31 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
       const senders = pc.getSenders();
       for (const track of stream.getTracks()) {
-        const existingSender = senders.find(s => s.track && s.track.kind === track.kind);
+        const existingSender = senders.find(
+          (s) => s.track && s.track.kind === track.kind
+        );
 
         try {
           if (existingSender) {
             if (existingSender.track !== track) {
-              console.log(`🔄 Replacing ${track.kind} track for ${remoteUserId}`);
+              console.log(
+                `🔄 Replacing ${track.kind} track for ${remoteUserId}`
+              );
               await existingSender.replaceTrack(track);
             } else {
-              console.log(`⏭️ ${track.kind} track already present for ${remoteUserId}`);
+              console.log(
+                `⏭️ ${track.kind} track already present for ${remoteUserId}`
+              );
             }
           } else {
             console.log(`➕ Adding ${track.kind} track for ${remoteUserId}`);
             pc.addTrack(track, stream);
           }
         } catch (err) {
-          console.error(`❌ Error syncing ${track.kind} track for ${remoteUserId}:`, err);
+          console.error(
+            `❌ Error syncing ${track.kind} track for ${remoteUserId}:`,
+            err
+          );
         }
       }
     };
@@ -455,9 +468,13 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           const senders = pc.getSenders();
 
           for (const track of stream.getTracks()) {
-            const sender = senders.find(s => s.track && s.track.kind === track.kind);
+            const sender = senders.find(
+              (s) => s.track && s.track.kind === track.kind
+            );
             if (sender) {
-              console.log(`🔄 Replacing ${track.kind} track for ${remoteUserId}`);
+              console.log(
+                `🔄 Replacing ${track.kind} track for ${remoteUserId}`
+              );
               await sender.replaceTrack(track);
             } else {
               console.log(`➕ Adding ${track.kind} track for ${remoteUserId}`);
@@ -512,14 +529,20 @@ const VideoPanel = ({ meetingId, userId, username }) => {
       // Switch back to camera or remove tracks safely
       for (const [remoteUserId, pc] of peerConnectionsRef.current.entries()) {
         const senders = pc.getSenders();
-        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-        const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+        const videoSender = senders.find(
+          (s) => s.track && s.track.kind === 'video'
+        );
+        const audioSender = senders.find(
+          (s) => s.track && s.track.kind === 'audio'
+        );
 
         try {
           // Switch video back to camera or stop it
           if (videoSender) {
             if (localStreamRef.current) {
-              await videoSender.replaceTrack(localStreamRef.current.getVideoTracks()[0]);
+              await videoSender.replaceTrack(
+                localStreamRef.current.getVideoTracks()[0]
+              );
             } else {
               pc.removeTrack(videoSender);
             }
@@ -527,7 +550,9 @@ const VideoPanel = ({ meetingId, userId, username }) => {
 
           // Switch audio back to camera or stop it
           if (audioSender && localStreamRef.current) {
-            await audioSender.replaceTrack(localStreamRef.current.getAudioTracks()[0]);
+            await audioSender.replaceTrack(
+              localStreamRef.current.getAudioTracks()[0]
+            );
           }
         } catch (err) {
           console.warn(`❌ Error reverting tracks for ${remoteUserId}:`, err);
@@ -537,7 +562,10 @@ const VideoPanel = ({ meetingId, userId, username }) => {
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          socketRef.current.emit('offer', { toUserId: remoteUserId, offer: pc.localDescription });
+          socketRef.current.emit('offer', {
+            toUserId: remoteUserId,
+            offer: pc.localDescription,
+          });
         } catch (negErr) {
           console.warn(`⚠️ Revert offer failed for ${remoteUserId}:`, negErr);
         }
@@ -568,9 +596,13 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           const senders = pc.getSenders();
           const videoTrack = stream.getVideoTracks()[0];
 
-          const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+          const videoSender = senders.find(
+            (s) => s.track && s.track.kind === 'video'
+          );
           if (videoSender) {
-            console.log(`🔄 Replacing video track with screen for ${remoteUserId}`);
+            console.log(
+              `🔄 Replacing video track with screen for ${remoteUserId}`
+            );
             await videoSender.replaceTrack(videoTrack);
           } else {
             console.log(`➕ Adding screen video track for ${remoteUserId}`);
@@ -622,14 +654,15 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           </div>
         ) : (
           <div
-            className={`grid gap-4 h-full content-center ${participants.size + 1 === 1
-              ? 'grid-cols-1'
-              : participants.size + 1 === 2
+            className={`grid gap-4 h-full content-center ${
+              participants.size + 1 === 1
+                ? 'grid-cols-1'
+                : participants.size + 1 === 2
                 ? 'grid-cols-1 md:grid-cols-2'
                 : participants.size + 1 <= 4
-                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
-                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-              }`}
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2'
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            }`}
           >
             {/* Local Video Tile */}
             <div className='relative aspect-video bg-dark-800 rounded-3xl overflow-hidden border border-white/5 shadow-2xl group'>
@@ -693,10 +726,11 @@ const VideoPanel = ({ meetingId, userId, username }) => {
           <div className='flex items-center gap-4'>
             <button
               onClick={toggleMic}
-              className={`p-4 rounded-full transition-all duration-300 border ${micEnabled
-                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
-                }`}
+              className={`p-4 rounded-full transition-all duration-300 border ${
+                micEnabled
+                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+              }`}
             >
               {micEnabled ? (
                 <Mic className='w-6 h-6' />
@@ -706,10 +740,11 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             </button>
             <button
               onClick={toggleCamera}
-              className={`p-4 rounded-full transition-all duration-300 border ${cameraEnabled
-                ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
-                }`}
+              className={`p-4 rounded-full transition-all duration-300 border ${
+                cameraEnabled
+                  ? 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+                  : 'bg-red-500 border-red-400/50 hover:bg-red-600 text-white'
+              }`}
             >
               {cameraEnabled ? (
                 <Video className='w-6 h-6' />
@@ -719,10 +754,11 @@ const VideoPanel = ({ meetingId, userId, username }) => {
             </button>
             <button
               onClick={toggleScreen}
-              className={`p-4 rounded-full transition-all duration-300 border ${screenEnabled
-                ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
-                : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
-                }`}
+              className={`p-4 rounded-full transition-all duration-300 border ${
+                screenEnabled
+                  ? 'bg-primary-600 border-primary-400/50 hover:bg-primary-700 text-white'
+                  : 'bg-dark-800 border-white/10 hover:bg-dark-700 text-white'
+              }`}
             >
               <Monitor className='w-6 h-6' />
             </button>
@@ -751,13 +787,35 @@ const RemoteTile = ({ userId, username, stream }) => {
 
   useEffect(() => {
     if (videoRef.current && stream) {
+      console.log(
+        `🎬 [RemoteTile] Attaching stream for ${username}:`,
+        stream.id,
+        'Tracks:',
+        stream.getTracks().map((t) => t.kind)
+      );
       videoRef.current.srcObject = stream;
 
+      // Force play
+      videoRef.current
+        .play()
+        .catch((e) => console.error('Remote video play error:', e));
+
       const checkTracks = () => {
-        setHasVideo(stream.getVideoTracks().length > 0);
+        const videoTracks = stream.getVideoTracks();
+        const hasVideoTrack = videoTracks.length > 0 && videoTracks[0].enabled;
+        console.log(
+          `📺 [RemoteTile] ${username} has video:`,
+          hasVideoTrack,
+          videoTracks
+        );
+        setHasVideo(hasVideoTrack);
       };
 
+      // Check immediately and after a small delay
       checkTracks();
+      setTimeout(checkTracks, 100);
+      setTimeout(checkTracks, 500);
+
       stream.onaddtrack = checkTracks;
       stream.onremovetrack = checkTracks;
 
@@ -765,8 +823,10 @@ const RemoteTile = ({ userId, username, stream }) => {
         stream.onaddtrack = null;
         stream.onremovetrack = null;
       };
+    } else {
+      console.log(`⚠️ [RemoteTile] No stream for ${username}`);
     }
-  }, [stream]);
+  }, [stream, username]);
 
   return (
     <div className='relative aspect-video bg-dark-800 rounded-3xl overflow-hidden border border-white/5 shadow-2xl group transition-transform duration-300 hover:scale-[1.01]'>
@@ -774,8 +834,11 @@ const RemoteTile = ({ userId, username, stream }) => {
         ref={videoRef}
         autoPlay
         playsInline
+        muted={false}
         key={stream?.id || 'no-stream'}
-        className={`w-full h-full object-cover ${hasVideo ? 'opacity-100' : 'opacity-0'}`}
+        className={`w-full h-full object-cover scale-x-[-1] ${
+          hasVideo ? 'opacity-100' : 'opacity-0'
+        }`}
       />
       {!hasVideo && (
         <div className='absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-tr from-dark-800 to-dark-900'>
