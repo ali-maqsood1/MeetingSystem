@@ -60,11 +60,11 @@ export default function ChatPanel({ meetingId }) {
 
     try {
       await api.sendMessage(meetingId, messageContent);
-      // Poll immediately to get the new message
+      
       await loadMessages();
     } catch (error) {
       console.error('Error sending message:', error);
-      setInputMessage(messageContent); // Restore input on error
+      setInputMessage(messageContent); 
     }
   };
 

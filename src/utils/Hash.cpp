@@ -3,7 +3,6 @@
 #include <sstream>
 #include <iomanip>
 
-// Simple SHA-256-like hash (for educational purposes)
 std::string sha256(const std::string &input)
 {
     uint64_t hash = 5381;
@@ -17,20 +16,16 @@ std::string sha256(const std::string &input)
     return ss.str();
 }
 
-// Hash password with simple salt
 std::string hash_password(const std::string &password)
 {
     return sha256("SALT_" + password + "_2024");
 }
 
-// Base64 implementation
 static const std::string base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
     "0123456789+/";
 
-// Fast base64 decode lookup table (OPTIMIZATION #2)
-// Maps ASCII char to base64 value (0-63), 255 = invalid
 static const uint8_t base64_decode_table[256] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -58,7 +53,6 @@ std::string encode_base64(const std::vector<uint8_t> &data)
 {
     size_t in_len = data.size();
 
-    // Pre-calculate exact output size and reserve buffer (OPTIMIZATION #1)
     size_t out_len = ((in_len + 2) / 3) * 4;
     std::string encoded;
     encoded.reserve(out_len);
@@ -79,7 +73,7 @@ std::string encode_base64(const std::vector<uint8_t> &data)
             char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
             char_array_4[3] = char_array_3[2] & 0x3f;
 
-            // Use push_back with pre-allocated buffer (faster than +=)
+            
             for (i = 0; i < 4; i++)
                 encoded.push_back(base64_chars[char_array_4[i]]);
             i = 0;
@@ -109,7 +103,6 @@ std::vector<uint8_t> decode_base64(const std::string &encoded_string)
 {
     size_t in_len = encoded_string.size();
 
-    // Pre-calculate output size and reserve buffer (OPTIMIZATION #3)
     size_t out_len = (in_len / 4) * 3;
     if (in_len > 0 && encoded_string[in_len - 1] == '=')
         out_len--;
@@ -130,7 +123,6 @@ std::vector<uint8_t> decode_base64(const std::string &encoded_string)
         in_++;
         if (i == 4)
         {
-            // Use lookup table instead of find() (O(1) vs O(64))
             for (i = 0; i < 4; i++)
                 char_array_4[i] = base64_decode_table[(unsigned char)char_array_4[i]];
 
@@ -146,7 +138,6 @@ std::vector<uint8_t> decode_base64(const std::string &encoded_string)
 
     if (i)
     {
-        // Use lookup table instead of find()
         for (j = 0; j < i; j++)
             char_array_4[j] = base64_decode_table[(unsigned char)char_array_4[j]];
 

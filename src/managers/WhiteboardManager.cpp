@@ -223,9 +223,6 @@ std::vector<WhiteboardElement> WhiteboardManager::get_elements_since(uint64_t me
 
 bool WhiteboardManager::clear_whiteboard(uint64_t meeting_id, std::string &error)
 {
-    // For DSA project, we'll mark all elements as deleted
-    // Full implementation would remove from B-Tree
-
     auto elements = get_meeting_elements(meeting_id);
 
     for (const auto &element : elements)
@@ -254,7 +251,6 @@ bool WhiteboardManager::delete_element(uint64_t element_id, std::string &error)
         return false;
     }
 
-    // Mark as deleted by setting element_type to invalid value
     element.element_type = 255; // Deleted marker
 
     // Update cache

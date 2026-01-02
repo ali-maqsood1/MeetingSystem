@@ -8,7 +8,7 @@
 struct User {
     uint64_t user_id;
     char email[128];
-    char password_hash[64];  // Store hashed password
+    char password_hash[64];  
     char username[64];
     uint64_t created_at;     // Unix timestamp
     

@@ -6,10 +6,8 @@
 #include <map>
 #include <vector>
 
-// Simple JSON builder (good enough for DSA project)
 class JSON {
 public:
-    // Build JSON from key-value pairs
     static std::string object(const std::map<std::string, std::string>& data) {
         std::ostringstream json;
         json << "{";
@@ -35,12 +33,10 @@ public:
         return "\"" + key + "\":\"" + escape(value) + "\"";
     }
 
-    // Const-char* overload to avoid accidental conversion to bool when passing C-strings
     static std::string field(const std::string& key, const char* value) {
         return field(key, std::string(value ? value : ""));
     }
 
-    // Add a raw JSON field (value is already a JSON fragment like {..} or [..])
     static std::string raw_field(const std::string& key, const std::string& raw_json) {
         return "\"" + key + "\":" + raw_json;
     }
@@ -133,7 +129,6 @@ public:
         
         return result;
     }
-    // For building NESTED objects (no outer braces)
     static std::string nested(const std::string& fields) {
         return "{" + fields + "}";
     }

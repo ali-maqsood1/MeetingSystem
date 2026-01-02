@@ -60,7 +60,6 @@ public:
     // Get all elements for meeting
     std::vector<WhiteboardElement> get_meeting_elements(uint64_t meeting_id);
 
-    // Get elements since timestamp (for incremental updates)
     std::vector<WhiteboardElement> get_elements_since(uint64_t meeting_id, uint64_t since_timestamp);
 
     // Clear whiteboard
@@ -72,7 +71,6 @@ public:
     // Get element by ID
     bool get_element(uint64_t element_id, WhiteboardElement &out_element);
 
-    // Delete all elements for a meeting (cleanup when deleting meeting)
     void delete_meeting_elements(uint64_t meeting_id);
 
 private:

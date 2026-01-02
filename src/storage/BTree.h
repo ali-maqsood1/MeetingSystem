@@ -10,7 +10,7 @@ const int BTREE_ORDER = 64; // Maximum 63 keys, 64 children
 const int MAX_KEYS = BTREE_ORDER - 1;
 const int MIN_KEYS = (BTREE_ORDER / 2) - 1;
 
-// Record location in database
+
 struct RecordLocation
 {
     uint64_t page_id;
@@ -22,7 +22,7 @@ struct RecordLocation
         : page_id(pid), offset(off), size(sz) {}
 };
 
-// B-Tree node structure (stored in page data)
+
 struct BTreeNode
 {
     bool is_leaf;
@@ -33,8 +33,7 @@ struct BTreeNode
     // Keys and values
     uint64_t keys[MAX_KEYS];
 
-    // For internal nodes: child page IDs
-    // For leaf nodes: record locations
+    
     union
     {
         uint64_t children[BTREE_ORDER];   // Internal nodes
@@ -122,7 +121,6 @@ private:
     void save_node(uint64_t page_id, const BTreeNode &node);
 
     int search_key_position(const BTreeNode &node, uint64_t key);
-    // Split the child at child_index of the parent located at parent_page_id
     void split_child(uint64_t parent_page_id, int child_index, uint64_t child_page_id);
     void insert_non_full(uint64_t node_page_id, uint64_t key, const RecordLocation &record);
 

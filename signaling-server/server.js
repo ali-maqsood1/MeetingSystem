@@ -4,13 +4,11 @@ const { Server } = require('socket.io');
 
 const app = express();
 
-// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'WebRTC Signaling Server' });
 });
 
-// In production (Render/Railway), use HTTP - they provide HTTPS via reverse proxy
-// In development, we used HTTPS directly
+
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
@@ -23,9 +21,9 @@ const io = new Server(httpServer, {
     pingInterval: 25000
 });
 
-const connectedUsers = new Map(); // socketId -> { username, userId, meetingId }
-const userIdToSocket = new Map(); // userId -> socketId
-const meetingCalls = new Map(); // meetingId -> Map of userId -> username
+const connectedUsers = new Map(); 
+const userIdToSocket = new Map(); 
+const meetingCalls = new Map(); 
 
 console.log('========================================');
 console.log('  WebRTC Signaling Server Starting...  ');
@@ -49,13 +47,11 @@ io.on('connection', (socket) => {
         }
         meetingCalls.get(meetingId).set(userId, username);
 
-        // Send list of users already in call to the new joiner
         const usersInCall = Array.from(meetingCalls.get(meetingId).entries())
             .filter(([id]) => id !== userId)
             .map(([id, name]) => ({ userId: id, username: name }));
         socket.emit('usersInCall', usersInCall);
 
-        // Notify others in the meeting room that someone joined the call
         socket.to(`meeting-${meetingId}`).emit('userJoinedCall', { userId, username });
 
         console.log(`📹 ${username} (ID: ${userId}) joined video call in meeting ${meetingId} (${meetingCalls.get(meetingId).size} users in call)`);
@@ -74,7 +70,6 @@ io.on('connection', (socket) => {
         console.log(`← ${username || userId} left video call in meeting ${meetingId}`);
     });
 
-    // WebRTC Signaling - Offer
     socket.on('offer', (data) => {
         const { offer, toUserId } = data;
         const fromUser = connectedUsers.get(socket.id);
@@ -91,7 +86,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // WebRTC Signaling - Answer
     socket.on('answer', (data) => {
         const { answer, toUserId } = data;
         const fromUser = connectedUsers.get(socket.id);
@@ -108,7 +102,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // WebRTC Signaling - ICE Candidate
     socket.on('iceCandidate', (data) => {
         const { candidate, toUserId } = data;
         const toSocketId = userIdToSocket.get(toUserId);

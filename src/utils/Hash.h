@@ -5,7 +5,6 @@
 #include <vector>
 #include <cstdint>
 
-// SHA-256 hash function
 std::string sha256(const std::string& input);
 
 // Simple hash for passwords

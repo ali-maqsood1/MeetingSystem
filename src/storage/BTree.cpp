@@ -9,10 +9,8 @@ BTree::BTree(DatabaseEngine *engine)
 
 void BTree::initialize()
 {
-    // Allocate root page
     root_page_id = db_engine->allocate_page();
 
-    // Create empty root node
     BTreeNode root;
     root.is_leaf = true;
     root.num_keys = 0;
@@ -88,13 +86,11 @@ RecordLocation BTree::search_internal(uint64_t node_page_id, uint64_t key, bool 
         return RecordLocation();
     }
 
-    // For internal nodes: if key equals separator key, descend to the right child
     if (pos < node.num_keys && node.keys[pos] == key)
     {
         return search_internal(node.children[pos + 1], key, found);
     }
 
-    // Otherwise descend to child[pos]
     return search_internal(node.children[pos], key, found);
 }
 
@@ -153,7 +149,6 @@ void BTree::split_child(uint64_t parent_page_id, int child_index, uint64_t child
     // Update child node size
     child.num_keys = mid;
 
-    // Insert middle key into parent (shift keys/children to make space)
     for (int i = parent.num_keys; i > child_index; i--)
     {
         parent.keys[i] = parent.keys[i - 1];
@@ -199,10 +194,9 @@ void BTree::insert_non_full(uint64_t node_page_id, uint64_t key, const RecordLoc
 
         if (child.num_keys == MAX_KEYS)
         {
-            // Split child first (pass parent page id)
             split_child(node_page_id, pos, child_page_id);
 
-            // Reload node as it was modified
+            
             node = load_node(node_page_id);
 
             if (key > node.keys[pos])
@@ -262,7 +256,6 @@ std::vector<RecordLocation> BTree::range_search(uint64_t start_key, uint64_t end
     uint64_t current_page = root_page_id;
     BTreeNode node = load_node(current_page);
 
-    // Traverse to leftmost leaf >= start_key
     while (!node.is_leaf)
     {
         int pos = search_key_position(node, start_key);
@@ -379,7 +372,7 @@ void BTree::merge(uint64_t node_page_id, int child_idx)
     BTreeNode child = load_node(node.children[child_idx]);
     BTreeNode sibling = load_node(node.children[child_idx + 1]);
 
-    // Pull key from parent and merge with right sibling
+    
     child.keys[child.num_keys] = node.keys[child_idx];
 
     // Copy keys from sibling
@@ -487,7 +480,6 @@ void BTree::fill_child(uint64_t node_page_id, int child_idx)
 {
     BTreeNode node = load_node(node_page_id);
 
-    // Borrow from previous sibling if possible
     if (child_idx != 0)
     {
         BTreeNode prev_sibling = load_node(node.children[child_idx - 1]);
@@ -552,13 +544,11 @@ void BTree::remove_internal(uint64_t node_page_id, uint64_t key)
         fill_child(node_page_id, idx);
         node = load_node(node_page_id);
 
-        // After filling, child might have merged, adjust idx
         if (idx > node.num_keys)
         {
             idx = node.num_keys;
         }
 
-        // Check if key is now in current node
         if (idx < node.num_keys && node.keys[idx] == key)
         {
             remove_from_non_leaf(node_page_id, idx);
@@ -581,7 +571,6 @@ bool BTree::remove(uint64_t key)
 
     remove_internal(root_page_id, key);
 
-    // If root is empty after deletion, make its only child the new root
     BTreeNode root = load_node(root_page_id);
     if (root.num_keys == 0 && !root.is_leaf)
     {

@@ -1,0 +1,42 @@
+# Build directories
+build/
+MeetingSystem/build/
+
+# Database files
+*.db
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled binaries
+meeting_server
+test_storage
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+CHAT_OPTIMIZATIONS.md
+
+camsetup.txt
+FILE_OPTIMIZATIONS_APPLIED.md
+FILE_UPLOAD_OPTIMIZATIONS.md
+
+README_WEBRTC.md
+WEBRTC_INTEGRATION_PLAN.md
+WHITEBOARD_OPTIMIZATIONS.md
+
+signaling-server/node_modules/
+
+DEPLOYMENT.md
+RAILWAY_DEPLOY.md
+SETUP_COTURN.md

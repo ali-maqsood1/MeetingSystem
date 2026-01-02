@@ -18,9 +18,7 @@ private:
     BTree *users_btree;
     HashTable *login_hash;
 
-    // Active sessions: token -> (user_id, expiry_time)
     std::map<std::string, std::pair<uint64_t, uint64_t>> sessions;
-    // User to active token mapping (for single session enforcement)
     std::map<uint64_t, std::string> user_sessions;
     std::mutex sessions_mutex;
 

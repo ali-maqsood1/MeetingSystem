@@ -4,7 +4,6 @@
 
 
 
-// Whiteboard element model
 struct WhiteboardElement {
     uint64_t element_id;
     uint64_t meeting_id;

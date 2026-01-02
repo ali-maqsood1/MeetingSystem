@@ -6,7 +6,7 @@
 // Meeting model
 struct Meeting {
     uint64_t meeting_id;
-    char meeting_code[16];   // Unique code to join
+    char meeting_code[16];   // Unique code
     char title[128];
     uint64_t creator_id;
     uint64_t created_at;

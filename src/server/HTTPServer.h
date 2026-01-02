@@ -21,13 +21,11 @@ struct HTTPRequest {
     std::map<std::string, std::string> path_params;  
     std::string body;
     
-    // Parsed from Authorization header
     std::string auth_token;
     
     HTTPRequest() {}
 };
 
-// HTTP Response structure
 struct HTTPResponse {
     int status_code;
     std::string status_message;
@@ -94,7 +92,7 @@ class HTTPServer {
 private:
     boost::asio::io_context io_context;
     tcp::acceptor acceptor;
-    std::map<std::string, std::map<std::string, RouteHandler>> routes; // method -> path -> handler
+    std::map<std::string, std::map<std::string, RouteHandler>> routes; 
     std::vector<std::thread> thread_pool;
     int thread_count;
     

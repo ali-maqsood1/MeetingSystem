@@ -2,14 +2,13 @@
 #include <cstdint>
 #include <cstring>
 
-// Message model (for chat)
 struct Message
 {
     uint64_t message_id;
     uint64_t meeting_id;
     uint64_t user_id;
     char username[64];
-    char content[2048]; // Increased from 512 to allow longer messages
+    char content[2048]; 
     uint64_t timestamp;
 
     Message() : message_id(0), meeting_id(0), user_id(0), timestamp(0)

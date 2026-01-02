@@ -5,7 +5,6 @@
 #include <cstring>
 #include <vector>
 
-// Page size: 4096 bytes (standard disk block size)
 const uint32_t PAGE_SIZE = 4096;
 const uint32_t PAGE_HEADER_SIZE = 64;
 const uint32_t PAGE_DATA_SIZE = PAGE_SIZE - PAGE_HEADER_SIZE;
@@ -25,7 +24,7 @@ struct PageHeader {
     uint8_t reserved1[7];       // 7 bytes padding
     uint64_t next_free_page;    // 8 bytes - for free list
     uint32_t checksum;          // 4 bytes
-    uint8_t reserved2[44];      // 44 bytes reserved for future use
+    uint8_t reserved2[44];      
     
     PageHeader() : type(FREE_PAGE), next_free_page(0), checksum(0) {
         memset(reserved1, 0, sizeof(reserved1));
@@ -33,7 +32,7 @@ struct PageHeader {
     }
 };
 
-// Complete page structure
+
 class Page {
 public:
     PageHeader header;
@@ -43,7 +42,6 @@ public:
         memset(data, 0, PAGE_DATA_SIZE);
     }
     
-    // Calculate checksum for data integrity
     uint32_t calculate_checksum() const {
         uint32_t sum = 0;
         for (size_t i = 0; i < PAGE_DATA_SIZE; i++) {
@@ -52,34 +50,29 @@ public:
         return sum;
     }
     
-    // Update checksum
     void update_checksum() {
         header.checksum = calculate_checksum();
     }
     
-    // Verify checksum
     bool verify_checksum() const {
         return header.checksum == calculate_checksum();
     }
     
-    // Serialize to bytes
     void serialize(uint8_t* buffer) const {
         memcpy(buffer, &header, PAGE_HEADER_SIZE);
         memcpy(buffer + PAGE_HEADER_SIZE, data, PAGE_DATA_SIZE);
     }
     
-    // Deserialize from bytes
     void deserialize(const uint8_t* buffer) {
         memcpy(&header, buffer, PAGE_HEADER_SIZE);
         memcpy(data, buffer + PAGE_HEADER_SIZE, PAGE_DATA_SIZE);
     }
 };
 
-// Database file header (stored in page 0)
 struct DatabaseHeader {
     char magic[4];              // "MTDB"
     uint32_t version;           // Database version
-    uint32_t page_size;         // Should be PAGE_SIZE
+    uint32_t page_size;         // PAGE_SIZE
     uint64_t total_pages;       // Total pages in database
     
     // B-Tree root pages

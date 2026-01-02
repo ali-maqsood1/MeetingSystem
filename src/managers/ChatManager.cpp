@@ -5,7 +5,6 @@
 #include <sstream>
 #include <cctype>
 
-// Constructor - start persistence thread
 ChatManager::ChatManager(DatabaseEngine *database, BTree *messages_tree, HashTable *search_hash)
     : db(database), messages_btree(messages_tree), chat_search_hash(search_hash),
       shutdown_flag(false)
@@ -13,7 +12,6 @@ ChatManager::ChatManager(DatabaseEngine *database, BTree *messages_tree, HashTab
     persistence_thread = std::thread(&ChatManager::persistence_worker, this);
 }
 
-// Destructor - clean shutdown
 ChatManager::~ChatManager()
 {
     shutdown_flag = true;
@@ -31,7 +29,6 @@ ChatManager::~ChatManager()
     }
 }
 
-// Background worker that persists messages
 void ChatManager::persistence_worker()
 {
     while (!shutdown_flag)
@@ -308,7 +305,7 @@ std::vector<Message> ChatManager::wait_for_messages(uint64_t meeting_id, uint64_
         auto elapsed = std::chrono::steady_clock::now() - start_time;
         if (elapsed >= timeout)
         {
-            return {}; // Empty vector - no new messages within timeout
+            return {}; 
         }
 
         // Wait for notification or timeout
@@ -322,7 +319,6 @@ std::vector<Message> ChatManager::get_messages(uint64_t meeting_id, int limit,
 {
     std::vector<Message> messages;
 
-    // 🔥 OPTIMIZED: Check cache first (now 500 msgs, should hit most of the time)
     {
         std::lock_guard<std::mutex> lock(cache_mutex);
         if (meeting_messages.find(meeting_id) != meeting_messages.end())
@@ -336,7 +332,6 @@ std::vector<Message> ChatManager::get_messages(uint64_t meeting_id, int limit,
                 }
             }
 
-            // If we have enough messages from cache, return immediately
             if (messages.size() >= (size_t)limit || cached.size() < 500)
             {
                 std::reverse(messages.begin(), messages.end());
@@ -345,7 +340,6 @@ std::vector<Message> ChatManager::get_messages(uint64_t meeting_id, int limit,
         }
     }
 
-    // Fallback: Load from database (only if cache miss or need older messages)
     auto locations = messages_btree->range_search(1, UINT64_MAX);
 
     for (auto it = locations.rbegin(); it != locations.rend() && messages.size() < (size_t)limit; ++it)
@@ -378,7 +372,7 @@ std::vector<Message> ChatManager::search_messages(uint64_t meeting_id, const std
 
         if (found)
         {
-            uint64_t message_id = loc.page_id; // We stored message_id here
+            uint64_t message_id = loc.page_id; 
 
             if (found_ids.find(message_id) == found_ids.end())
             {
@@ -405,7 +399,7 @@ std::vector<Message> ChatManager::search_messages(uint64_t meeting_id, const std
 
 bool ChatManager::get_message(uint64_t message_id, Message &out_message)
 {
-    // 🔥 OPTIMIZED: Check cache first (O(1) lookup)
+    
     {
         std::lock_guard<std::mutex> lock(cache_mutex);
         auto it = message_by_id.find(message_id);
@@ -416,7 +410,6 @@ bool ChatManager::get_message(uint64_t message_id, Message &out_message)
         }
     }
 
-    // Fallback: Load from database
     bool found;
     RecordLocation loc = messages_btree->search(message_id, found);
 
@@ -433,8 +426,7 @@ bool ChatManager::get_message(uint64_t message_id, Message &out_message)
 
 bool ChatManager::delete_message(uint64_t message_id, std::string &error)
 {
-    // For DSA project, we'll just mark it as deleted (set content to empty)
-    // Full implementation would remove from B-Tree
+    
     Message message;
     if (!get_message(message_id, message))
     {
@@ -492,7 +484,6 @@ void ChatManager::delete_meeting_messages(uint64_t meeting_id)
     // Remove from cache
     meeting_messages.erase(meeting_id);
 
-    // Remove individual messages from message_by_id cache
     for (auto it = message_by_id.begin(); it != message_by_id.end();)
     {
         if (it->second.meeting_id == meeting_id)

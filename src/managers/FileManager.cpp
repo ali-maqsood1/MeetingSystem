@@ -5,7 +5,7 @@
 
 std::string FileManager::calculate_file_hash(const uint8_t *data, size_t size)
 {
-    // Simple hash for DSA project (in production, use SHA-256)
+    
     uint64_t hash = 5381;
     for (size_t i = 0; i < size; i++)
     {
@@ -22,7 +22,7 @@ std::string FileManager::calculate_file_hash(const uint8_t *data, size_t size)
 
 uint64_t FileManager::store_file_data(const uint8_t *data, size_t size)
 {
-    const size_t CHUNK_SIZE = PAGE_DATA_SIZE - 16; // Leave room for metadata
+    const size_t CHUNK_SIZE = PAGE_DATA_SIZE - 16; 
     size_t bytes_written = 0;
     uint64_t first_page_id = 0;
     uint64_t prev_page_id = 0;
@@ -97,7 +97,7 @@ bool FileManager::read_file_data(uint64_t first_page_id, size_t size,
 
 bool FileManager::store_file_record(const FileRecord &file)
 {
-    // Allocate page for file record
+    
     uint64_t data_page_id = db->allocate_page();
 
     // Serialize file record
@@ -120,7 +120,6 @@ bool FileManager::store_file_record(const FileRecord &file)
         return false;
     }
 
-    // Index in hash table by file_hash
     if (!file_dedup_hash->insert(file.file_hash, file_loc))
     {
         std::cerr << "Failed to insert file hash" << std::endl;
@@ -179,7 +178,6 @@ bool FileManager::upload_file(uint64_t meeting_id, uint64_t uploader_id,
     FileRecord existing_file;
     if (file_exists_by_hash(file_hash, existing_file))
     {
-        // File already exists, just create new record pointing to same data
         std::cout << "File deduplication: reusing existing data" << std::endl;
 
         FileRecord file;
@@ -315,7 +313,6 @@ bool FileManager::delete_file(uint64_t file_id, uint64_t user_id, uint64_t meeti
         return false;
     }
 
-    // Authorization: Only uploader or meeting creator can delete
     if (file.uploader_id != user_id && meeting_creator_id != user_id)
     {
         error = "You don't have permission to delete this file";
@@ -332,7 +329,6 @@ bool FileManager::delete_file(uint64_t file_id, uint64_t user_id, uint64_t meeti
         return false;
     }
 
-    // Count references to this data (check how many files use the same data_page_id)
     int ref_count = 0;
     auto all_locations = files_btree->range_search(1, UINT64_MAX);
 
@@ -348,7 +344,7 @@ bool FileManager::delete_file(uint64_t file_id, uint64_t user_id, uint64_t meeti
         }
     }
 
-    // If this was the last file referencing this data, free the data pages
+    
     if (ref_count == 0)
     {
         // Free the linked list of data pages
@@ -368,10 +364,6 @@ bool FileManager::delete_file(uint64_t file_id, uint64_t user_id, uint64_t meeti
 
             current_page_id = next_page_id;
         }
-
-        // Also remove from hash table since no files reference this data anymore
-        // Note: HashTable::remove() would need to be implemented as well
-        // For now, we'll leave it in the hash table (it won't cause issues)
 
         std::cout << "File deleted and data freed: " << file.filename << " (ID: " << file_id << ")" << std::endl;
     }
@@ -402,7 +394,6 @@ bool FileManager::file_exists_by_hash(const std::string &file_hash, FileRecord &
 
 void FileManager::delete_meeting_files(uint64_t meeting_id)
 {
-    // Find all files for this meeting and delete them
     auto locations = files_btree->range_search(1, UINT64_MAX);
     for (const auto &loc : locations)
     {

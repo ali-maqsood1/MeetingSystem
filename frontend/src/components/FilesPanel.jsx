@@ -30,10 +30,8 @@ export default function FilesPanel({
   const username = getUsername();
   const userId = Number(currentUserId);
 
-  // Helper to check if current user can delete a file
   const canDeleteFile = (file) => {
     if (!userId || !file) return false;
-    // User can delete if they uploaded it OR if they're the meeting creator
     return (
       file.uploader_id === userId ||
       (meetingCreatorId && userId === Number(meetingCreatorId))

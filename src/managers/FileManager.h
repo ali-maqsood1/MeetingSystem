@@ -29,7 +29,7 @@ public:
     bool download_file(uint64_t file_id, std::vector<uint8_t> &out_data,
                        FileRecord &out_file, std::string &error);
 
-    // Get files for meeting
+    
     std::vector<FileRecord> get_meeting_files(uint64_t meeting_id);
 
     // Get file info
@@ -39,14 +39,14 @@ public:
     bool delete_file(uint64_t file_id, uint64_t user_id, uint64_t meeting_id,
                      uint64_t meeting_creator_id, std::string &error);
 
-    // Check if file exists by hash (deduplication)
+    
     bool file_exists_by_hash(const std::string &file_hash, FileRecord &out_file);
 
-    // Delete all files for a meeting (cleanup when deleting meeting)
+    
     void delete_meeting_files(uint64_t meeting_id);
 
 private:
-    // Calculate SHA-256-like hash
+    
     std::string calculate_file_hash(const uint8_t *data, size_t size);
 
     // Store file data across multiple pages

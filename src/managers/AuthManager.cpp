@@ -5,15 +5,13 @@
 
 std::string AuthManager::hash_password(const std::string &password)
 {
-    // Simple hash function for DSA project
-    // In production, use bcrypt or argon2
+    
     uint64_t hash = 5381;
     for (char c : password)
     {
         hash = ((hash << 5) + hash) + c;
     }
 
-    // Add salt
     hash ^= 0xDEADBEEF;
 
     char hash_str[65];
@@ -115,7 +113,6 @@ bool AuthManager::register_user(const std::string &email, const std::string &use
         return false;
     }
 
-    // Save database header (to persist counter)
     db->write_header();
 
     out_user = user;
@@ -144,9 +141,9 @@ bool AuthManager::login(const std::string &email, const std::string &password,
 
     // Generate session token
     std::string token = generate_token();
-    uint64_t expiry = std::time(nullptr) + (24 * 60 * 60); // 24 hours
+    uint64_t expiry = std::time(nullptr) + (24 * 60 * 60); 
 
-    // Store session (with single session enforcement)
+    
     {
         std::lock_guard<std::mutex> lock(sessions_mutex);
 
@@ -197,7 +194,6 @@ void AuthManager::logout(const std::string &token)
 {
     std::lock_guard<std::mutex> lock(sessions_mutex);
 
-    // Find and remove from user_sessions mapping
     auto it = sessions.find(token);
     if (it != sessions.end())
     {

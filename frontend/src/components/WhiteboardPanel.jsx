@@ -51,7 +51,7 @@ export default function WhiteboardPanel({ meetingId }) {
 
   useEffect(() => {
     loadWhiteboard();
-    const interval = setInterval(loadWhiteboard, 500); // Reduced from 3000ms to 500ms
+    const interval = setInterval(loadWhiteboard, 500); 
     return () => clearInterval(interval);
   }, [meetingId]);
 
@@ -61,8 +61,6 @@ export default function WhiteboardPanel({ meetingId }) {
     elements,
     zoom,
     pan,
-    // Removed frequently changing values to reduce re-renders
-    // isDrawing, currentPos, startPos are handled by renderWhiteboard directly
   ]);
 
   const loadWhiteboard = async () => {
@@ -490,10 +488,10 @@ export default function WhiteboardPanel({ meetingId }) {
         stroke_width: strokeWidth,
         text: '',
       });
-      await loadWhiteboard(); // Refresh to get server element ID
+      await loadWhiteboard(); 
     } catch (error) {
       console.error('Error drawing:', error);
-      await loadWhiteboard(); // Reload on error to remove optimistic element
+      await loadWhiteboard(); 
     }
   };
 
@@ -539,10 +537,10 @@ export default function WhiteboardPanel({ meetingId }) {
         stroke_width: fontSize,
         text: textInput,
       });
-      await loadWhiteboard(); // Refresh to get server element ID
+      await loadWhiteboard(); 
     } catch (error) {
       console.error('Error saving text:', error);
-      await loadWhiteboard(); // Reload on error to remove optimistic element
+      await loadWhiteboard(); 
     }
   };
 

@@ -18,7 +18,7 @@ const VideoPanel = ({ meetingId, userId, username }) => {
   const [micEnabled, setMicEnabled] = useState(true);
   const [screenEnabled, setScreenEnabled] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState(new Map());
-  const [participants, setParticipants] = useState(new Map()); // userId -> username
+  const [participants, setParticipants] = useState(new Map()); 
 
   const localVideoRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -26,11 +26,10 @@ const VideoPanel = ({ meetingId, userId, username }) => {
   const peerConnectionsRef = useRef(new Map());
   const socketRef = useRef(null);
   const inCallRef = useRef(false);
-  const negotiationStateRef = useRef(new Map()); // remoteUserId -> { makingOffer: bool, ignoreOffer: bool }
+  const negotiationStateRef = useRef(new Map()); 
 
   const isPolite = (remoteId) => String(userId) < String(remoteId);
 
-  // Use environment variable for signaling server, or construct from hostname
   const getSignalingUrl = () => {
     if (import.meta.env.VITE_SIGNALING_URL) {
       return import.meta.env.VITE_SIGNALING_URL;

@@ -6,25 +6,20 @@ import Meeting from './pages/Meeting';
 
 function App() {
   useEffect(() => {
-    // Ping Render signaling server to wake it up
     const wakeUpSignalingServer = async () => {
-      // Replace with your actual Render signaling server URL
       const SIGNALING_SERVER_URL =
         import.meta.env.VITE_SIGNALING_SERVER_URL ||
-        'https://your-signaling-server.onrender.com';
+        'https://meeting-signaling.onrender.com';
 
       try {
         console.log('Pinging signaling server to wake it up...');
-        // Just fetch to wake up the server - don't care about response
         await fetch(`${SIGNALING_SERVER_URL}/health`, {
           method: 'GET',
-          mode: 'no-cors', // Avoid CORS issues for the ping
+          mode: 'no-cors', 
         }).catch(() => {
-          // Ignore errors - server might be waking up
         });
         console.log('Signaling server pinged successfully');
       } catch (error) {
-        // Silently fail - server will wake up eventually
         console.log('Signaling server ping sent (may still be waking up)');
       }
     };

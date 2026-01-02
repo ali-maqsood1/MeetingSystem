@@ -30,7 +30,7 @@ void HTTPConnection::read_request()
                                               header_lines.push_back(line);
                                           }
 
-                                          // Parse headers to get Content-Length
+                                          
                                           std::map<std::string, std::string> temp_headers;
                                           int content_length = 0;
                                           for (const auto &hl : header_lines)
@@ -58,7 +58,6 @@ void HTTPConnection::read_request()
                                               }
                                           }
 
-                                          // Read any body data already in buffer
                                           std::string body_so_far((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
 
                                           // Lambda to process the complete request
@@ -106,7 +105,6 @@ void HTTPConnection::read_request()
                                           }
                                           else
                                           {
-                                              // We have all the body (or no body expected)
                                               process_request(body_so_far);
                                           }
                                       }
@@ -146,7 +144,6 @@ HTTPRequest HTTPConnection::parse_request(const std::string &raw_request)
         std::string path_with_query;
         line_stream >> request.method >> path_with_query >> request.version;
 
-        // Split path and query string
         size_t query_pos = path_with_query.find('?');
         if (query_pos != std::string::npos)
         {
@@ -201,12 +198,10 @@ HTTPRequest HTTPConnection::parse_request(const std::string &raw_request)
         }
     }
 
-    // Read body - everything remaining in the stream
     std::string remaining_body((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
 
     if (content_length > 0)
     {
-        // Take exactly content_length bytes
         request.body = remaining_body.substr(0, std::min((size_t)content_length, remaining_body.size()));
     }
     else

@@ -10,7 +10,7 @@ struct FileRecord {
     uint64_t meeting_id;
     uint64_t uploader_id;
     char filename[256];
-    char file_hash[64];      // SHA-256 hash for deduplication
+    char file_hash[64];      
     uint64_t file_size;
     uint64_t uploaded_at;
     uint64_t data_page_id;   // First page of file data

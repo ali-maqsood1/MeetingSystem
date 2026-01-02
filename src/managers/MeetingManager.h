@@ -69,7 +69,7 @@ public:
 
 private:
     std::map<uint64_t, std::vector<MeetingParticipant>> meeting_participants;
-    // Generate unique meeting code (ABC-DEF-123 format)
+    
     std::string generate_meeting_code();
 
     // Store meeting in database

@@ -29,7 +29,7 @@ std::string MeetingManager::generate_meeting_code()
 
 bool MeetingManager::store_meeting(const Meeting &meeting)
 {
-    // Allocate page for meeting data
+    
     uint64_t data_page_id = db->allocate_page();
 
     // Serialize meeting
@@ -44,7 +44,7 @@ bool MeetingManager::store_meeting(const Meeting &meeting)
     // Create record location
     RecordLocation meeting_loc(data_page_id, 0, Meeting::serialized_size());
 
-    // Index in B-Tree by meeting_id
+    
     if (!meetings_btree->insert(meeting.meeting_id, meeting_loc))
     {
         std::cerr << "Failed to insert meeting into B-Tree" << std::endl;
@@ -143,7 +143,6 @@ bool MeetingManager::join_meeting(const std::string &meeting_code, uint64_t user
         return false;
     }
 
-    // ✅ ADD PARTICIPANT FOR EVERYONE (including creator)
     add_participant(out_meeting.meeting_id, user_id);
 
     if (out_meeting.creator_id == user_id)
@@ -338,7 +337,7 @@ std::vector<MeetingParticipant> MeetingManager::get_participants(uint64_t meetin
 
 bool MeetingManager::delete_meeting(uint64_t meeting_id, uint64_t user_id, std::string &error)
 {
-    // Get the meeting to check ownership
+    
     Meeting meeting;
     if (!get_meeting(meeting_id, meeting))
     {
